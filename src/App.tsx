@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+
 type Athlete = {
   id: number;
   name: string;
@@ -11,6 +14,24 @@ type Session = {
   team: string;
   time: string;
   attendance: number;
+};
+
+type GoogleJwtPayload = {
+  email?: string;
+  given_name?: string;
+  name?: string;
+  picture?: string;
+  sub?: string;
+};
+
+type AuthenticatedUser = {
+  email: string;
+  name: string;
+  picture?: string;
+};
+
+type AppProps = {
+  googleClientIdConfigured: boolean;
 };
 
 const athletes: Athlete[] = [
@@ -50,8 +71,153 @@ const metrics = [
   { label: 'Equipos registrados', value: '12' },
 ];
 
-function App() {
+function decodeGoogleCredential(credential: string): GoogleJwtPayload | null {
+  const [, payload] = credential.split('.');
+
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedBase64 = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const json = decodeURIComponent(
+      atob(paddedBase64)
+        .split('')
+        .map((character) => `%${character.charCodeAt(0).toString(16).padStart(2, '0')}`)
+        .join(''),
+    );
+
+    return JSON.parse(json) as GoogleJwtPayload;
+  } catch {
+    return null;
+  }
+}
+
+function userFromGoogleCredential(response: CredentialResponse): AuthenticatedUser | null {
+  if (!response.credential) {
+    return null;
+  }
+
+  const payload = decodeGoogleCredential(response.credential);
+
+  if (!payload?.email) {
+    return null;
+  }
+
+  return {
+    email: payload.email,
+    name: payload.name ?? payload.given_name ?? payload.email,
+    picture: payload.picture,
+  };
+}
+
+function LoginScreen({
+  error,
+  googleClientIdConfigured,
+  onDemoAccess,
+  onGoogleSuccess,
+  onGoogleError,
+}: {
+  error: string | null;
+  googleClientIdConfigured: boolean;
+  onDemoAccess: () => void;
+  onGoogleSuccess: (response: CredentialResponse) => void;
+  onGoogleError: () => void;
+}) {
+  return (
+    <main className="login-layout">
+      <section className="login-hero">
+        <a className="brand" href="#inicio" aria-label="Sportia inicio">
+          <span className="brand-mark">S</span>
+          <span>Sportia</span>
+        </a>
+        <p className="eyebrow">Acceso para entrenadores</p>
+        <h1>Entra a Sportia con tu cuenta de Google.</h1>
+        <p>
+          Centraliza asistencia, equipos y entrenamientos con un acceso simple para
+          entrenadores y coordinadores deportivos.
+        </p>
+      </section>
+
+      <section className="login-card" aria-labelledby="login-title">
+        <div>
+          <p className="eyebrow">Login</p>
+          <h2 id="login-title">Continuar con Google</h2>
+          <p>
+            Usaremos Google Identity Services para validar tu identidad antes de abrir el
+            panel de Sportia.
+          </p>
+        </div>
+
+        {googleClientIdConfigured ? (
+          <div className="google-login-frame">
+            <GoogleLogin
+              onSuccess={onGoogleSuccess}
+              onError={onGoogleError}
+              text="continue_with"
+              shape="pill"
+              size="large"
+              theme="outline"
+              useOneTap
+            />
+          </div>
+        ) : (
+          <div className="config-warning" role="status">
+            <strong>Falta configurar Google.</strong>
+            <span>
+              Crea un archivo <code>.env</code> con <code>VITE_GOOGLE_CLIENT_ID</code>.
+              Mientras tanto puedes entrar en modo demo.
+            </span>
+          </div>
+        )}
+
+        {error ? <p className="auth-error">{error}</p> : null}
+
+        <button className="demo-button" type="button" onClick={onDemoAccess}>
+          Entrar en modo demo
+        </button>
+      </section>
+    </main>
+  );
+}
+
+function App({ googleClientIdConfigured }: AppProps) {
+  const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const presentCount = athletes.filter((athlete) => athlete.status === 'Presente').length;
+
+  const handleGoogleSuccess = (response: CredentialResponse) => {
+    const googleUser = userFromGoogleCredential(response);
+
+    if (!googleUser) {
+      setAuthError('No pudimos leer los datos de Google. Intentalo nuevamente.');
+      return;
+    }
+
+    setUser(googleUser);
+    setAuthError(null);
+  };
+
+  const handleDemoAccess = () => {
+    setUser({
+      email: 'demo@sportia.app',
+      name: 'Entrenador demo',
+    });
+    setAuthError(null);
+  };
+
+  if (!user) {
+    return (
+      <LoginScreen
+        error={authError}
+        googleClientIdConfigured={googleClientIdConfigured}
+        onDemoAccess={handleDemoAccess}
+        onGoogleError={() => setAuthError('Google no pudo iniciar sesion. Intentalo otra vez.')}
+        onGoogleSuccess={handleGoogleSuccess}
+      />
+    );
+  }
 
   return (
     <main className="app-shell">
@@ -64,6 +230,20 @@ function App() {
           <a href="#asistencia">Asistencia</a>
           <a href="#equipos">Equipos</a>
           <a href="#sesiones">Sesiones</a>
+        </div>
+        <div className="user-menu">
+          {user.picture ? (
+            <img className="user-avatar" src={user.picture} alt="" referrerPolicy="no-referrer" />
+          ) : (
+            <span className="user-avatar fallback">{user.name.charAt(0)}</span>
+          )}
+          <div>
+            <strong>{user.name}</strong>
+            <span>{user.email}</span>
+          </div>
+          <button className="sign-out-button" type="button" onClick={() => setUser(null)}>
+            Salir
+          </button>
         </div>
       </nav>
 
@@ -85,7 +265,7 @@ function App() {
           </div>
         </div>
 
-        <aside className="attendance-card" aria-label="Resumen de asistencia de hoy">
+        <aside className="attendance-card" id="asistencia" aria-label="Resumen de asistencia de hoy">
           <div className="card-header">
             <span>Entrenamiento de hoy</span>
             <strong>{presentCount}/{athletes.length}</strong>

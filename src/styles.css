@@ -28,6 +28,130 @@ a {
   text-decoration: none;
 }
 
+button {
+  font: inherit;
+}
+
+.login-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 28px;
+  align-items: stretch;
+  width: min(1180px, calc(100% - 32px));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 28px 0;
+}
+
+.login-hero,
+.login-card {
+  border: 1px solid rgba(16, 32, 23, 0.08);
+  border-radius: 42px;
+  box-shadow: 0 22px 70px rgba(16, 32, 23, 0.1);
+}
+
+.login-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  padding: 46px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(182, 242, 100, 0.28), transparent 32%),
+    linear-gradient(135deg, #102017 0%, #0f3d2b 48%, #159447 100%);
+}
+
+.login-hero .brand {
+  position: absolute;
+  top: 46px;
+}
+
+.login-hero h1 {
+  max-width: 720px;
+  margin: 0;
+  font-size: clamp(2.7rem, 6vw, 5.25rem);
+  line-height: 0.92;
+  letter-spacing: -0.08em;
+}
+
+.login-hero p:not(.eyebrow) {
+  max-width: 600px;
+  margin: 24px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1.12rem;
+  line-height: 1.7;
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+  padding: 42px;
+  background: #fff;
+}
+
+.login-card h2 {
+  margin: 0 0 14px;
+  color: #102017;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+
+.login-card p {
+  margin: 0;
+  color: #667b6f;
+  line-height: 1.7;
+}
+
+.google-login-frame {
+  min-height: 44px;
+}
+
+.config-warning,
+.auth-error {
+  border-radius: 22px;
+  padding: 16px;
+}
+
+.config-warning {
+  display: grid;
+  gap: 8px;
+  color: #5f3f05;
+  background: #fef3c7;
+}
+
+.config-warning code {
+  padding: 2px 6px;
+  border-radius: 8px;
+  color: #102017;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.auth-error {
+  color: #991b1b;
+  background: #fee2e2;
+  font-weight: 800;
+}
+
+.demo-button,
+.sign-out-button {
+  border: 0;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.demo-button {
+  min-height: 50px;
+  border-radius: 999px;
+  color: #fff;
+  background: #0f7a3f;
+  box-shadow: 0 16px 34px rgba(15, 122, 63, 0.24);
+}
+
 .app-shell {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
@@ -37,6 +161,7 @@ a {
 .topbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 24px;
   padding: 14px 18px;
@@ -53,7 +178,8 @@ a {
 .card-header,
 .athlete-row,
 .session-card,
-.session-meta {
+.session-meta,
+.user-menu {
   display: flex;
   align-items: center;
 }
@@ -84,6 +210,60 @@ a {
 
 .nav-links a:hover {
   color: #0f7a3f;
+}
+
+.user-menu {
+  gap: 10px;
+  padding: 7px;
+  padding-left: 10px;
+  border-radius: 999px;
+  background: #f3f8f5;
+}
+
+.user-menu div {
+  display: grid;
+  min-width: 0;
+}
+
+.user-menu strong {
+  max-width: 140px;
+  overflow: hidden;
+  color: #102017;
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu span:not(.user-avatar) {
+  max-width: 160px;
+  overflow: hidden;
+  color: #667b6f;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-avatar.fallback {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #0f7a3f;
+  font-weight: 900;
+}
+
+.sign-out-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: #0f7a3f;
+  background: #dcfce7;
 }
 
 .hero {
@@ -354,10 +534,19 @@ a {
 }
 
 @media (max-width: 900px) {
+  .login-layout,
   .hero,
   .content-grid,
   .metrics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .login-layout {
+    min-height: auto;
+  }
+
+  .login-hero {
+    min-height: 520px;
   }
 
   .hero-copy {
@@ -367,9 +556,28 @@ a {
 }
 
 @media (max-width: 640px) {
+  .login-layout,
   .app-shell {
     width: min(100% - 20px, 1180px);
     padding-top: 12px;
+  }
+
+  .login-hero,
+  .login-card {
+    border-radius: 24px;
+    padding: 30px;
+  }
+
+  .login-hero {
+    min-height: 520px;
+  }
+
+  .login-hero .brand {
+    top: 30px;
+  }
+
+  .login-hero h1 {
+    font-size: 3rem;
   }
 
   .topbar {
@@ -383,6 +591,21 @@ a {
     justify-content: space-between;
     gap: 10px;
     font-size: 0.86rem;
+  }
+
+  .user-menu {
+    width: 100%;
+    justify-content: space-between;
+    border-radius: 20px;
+  }
+
+  .user-menu div {
+    flex: 1;
+  }
+
+  .user-menu strong,
+  .user-menu span:not(.user-avatar) {
+    max-width: 190px;
   }
 
   .hero {
