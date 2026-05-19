@@ -48,14 +48,6 @@ type Athlete = {
   status: AttendanceStatus;
 };
 
-type Session = {
-  id: number;
-  title: string;
-  team: string;
-  time: string;
-  attendance: number;
-};
-
 type GoogleJwtPayload = {
   email?: string;
   given_name?: string;
@@ -341,30 +333,6 @@ const initialAthletes: Athlete[] = [
     stayedAsGuest: false,
     hostedGuest: false,
     status: 'Presente',
-  },
-];
-
-const sessions: Session[] = [
-  {
-    id: 1,
-    title: 'Tecnica y movilidad',
-    team: 'Sub 16 futbol',
-    time: 'Hoy, 18:30',
-    attendance: 92,
-  },
-  {
-    id: 2,
-    title: 'Defensa en zona',
-    team: 'Basquet femenino',
-    time: 'Manana, 10:00',
-    attendance: 86,
-  },
-  {
-    id: 3,
-    title: 'Bloqueo y recepcion',
-    team: 'Voley mixto',
-    time: 'Viernes, 19:00',
-    attendance: 78,
   },
 ];
 
@@ -913,7 +881,6 @@ function App({ googleClientIdConfigured }: AppProps) {
           <a href="#ranking">Ranking</a>
           {isPrivilegedUser ? <a href="#reportes">Reportes</a> : null}
           {isPrivilegedUser ? <a href="#equipos">Equipos</a> : null}
-          {isPrivilegedUser ? <a href="#sesiones">Sesiones</a> : null}
         </div>
         <div className="user-menu">
           {user.picture ? (
@@ -1770,28 +1737,7 @@ function App({ googleClientIdConfigured }: AppProps) {
         </p>
       </section>
 
-      <section className="content-grid">
-        <div className="panel" id="sesiones">
-          <div className="section-heading">
-            <p className="eyebrow">Agenda</p>
-            <h2>Proximas sesiones</h2>
-          </div>
-          <div className="session-list">
-            {sessions.map((session) => (
-              <article className="session-card" key={session.id}>
-                <div>
-                  <h3>{session.title}</h3>
-                  <p>{session.team}</p>
-                </div>
-                <div className="session-meta">
-                  <span>{session.time}</span>
-                  <strong>{session.attendance}%</strong>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-
+      <section className="content-grid single-panel-grid">
         <div className="panel accent-panel" id="equipos">
           <p className="eyebrow">Siguiente paso</p>
           <h2>Primer modulo listo para conectar datos reales.</h2>

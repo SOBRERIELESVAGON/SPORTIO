@@ -1005,6 +1005,10 @@ button {
   gap: 24px;
 }
 
+.single-panel-grid {
+  grid-template-columns: 1fr;
+}
+
 .panel {
   padding: 28px;
 }
