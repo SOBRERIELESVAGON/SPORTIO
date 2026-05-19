@@ -2,6 +2,15 @@ import { useState, type FormEvent } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
 type AttendanceStatus = 'Presente' | 'Ausente' | 'Tarde';
+type ReportPeriod =
+  | 'Diario'
+  | 'Semanal'
+  | 'Mensual'
+  | 'Bimestral'
+  | 'Trimestral'
+  | 'Semestral'
+  | 'Anual';
+type ReportScope = 'General' | 'División' | 'Equipo' | 'Camada' | 'Individual';
 
 type Athlete = {
   id: number;
@@ -54,6 +63,69 @@ const sportOptions = [
   'Futsal',
   'Lacrosse',
 ];
+
+const reportPeriods: ReportPeriod[] = [
+  'Diario',
+  'Semanal',
+  'Mensual',
+  'Bimestral',
+  'Trimestral',
+  'Semestral',
+  'Anual',
+];
+
+const reportScopes: ReportScope[] = ['General', 'División', 'Equipo', 'Camada', 'Individual'];
+
+const reportGroupsByScope: Record<Exclude<ReportScope, 'Individual'>, string[]> = {
+  General: ['Toda la institución'],
+  División: ['Sub 14', 'Sub 16', 'Sub 18', 'Primera'],
+  Equipo: ['Fútbol Sub 16', 'Rugby M17', 'Voleibol mixto', 'Baloncesto femenino'],
+  Camada: ['Camada 2008', 'Camada 2009', 'Camada 2010', 'Camada 2011'],
+};
+
+const reportSeriesByPeriod: Record<ReportPeriod, { label: string; attendance: number }[]> = {
+  Diario: [
+    { label: 'Lun', attendance: 82 },
+    { label: 'Mar', attendance: 88 },
+    { label: 'Mié', attendance: 91 },
+    { label: 'Jue', attendance: 76 },
+    { label: 'Vie', attendance: 94 },
+  ],
+  Semanal: [
+    { label: 'Sem 1', attendance: 78 },
+    { label: 'Sem 2', attendance: 84 },
+    { label: 'Sem 3', attendance: 89 },
+    { label: 'Sem 4', attendance: 92 },
+  ],
+  Mensual: [
+    { label: 'Ene', attendance: 72 },
+    { label: 'Feb', attendance: 80 },
+    { label: 'Mar', attendance: 86 },
+    { label: 'Abr', attendance: 90 },
+  ],
+  Bimestral: [
+    { label: 'Bim 1', attendance: 76 },
+    { label: 'Bim 2', attendance: 83 },
+    { label: 'Bim 3', attendance: 87 },
+    { label: 'Bim 4', attendance: 91 },
+  ],
+  Trimestral: [
+    { label: 'Tri 1', attendance: 79 },
+    { label: 'Tri 2', attendance: 85 },
+    { label: 'Tri 3', attendance: 88 },
+    { label: 'Tri 4', attendance: 93 },
+  ],
+  Semestral: [
+    { label: 'Sem 1', attendance: 84 },
+    { label: 'Sem 2', attendance: 91 },
+  ],
+  Anual: [
+    { label: '2022', attendance: 74 },
+    { label: '2023', attendance: 81 },
+    { label: '2024', attendance: 87 },
+    { label: '2025', attendance: 90 },
+  ],
+};
 
 const initialAthletes: Athlete[] = [
   { id: 1, name: 'Lucia Mendez', sport: 'Fútbol', status: 'Presente' },
@@ -207,9 +279,23 @@ function App({ googleClientIdConfigured }: AppProps) {
     status: 'Presente' as AttendanceStatus,
   });
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Semanal');
+  const [reportScope, setReportScope] = useState<ReportScope>('General');
+  const [reportTarget, setReportTarget] = useState(reportGroupsByScope.General[0]);
   const presentCount = athleteList.filter((athlete) => athlete.status === 'Presente').length;
   const attendancePercentage = Math.round((presentCount / athleteList.length) * 100);
   const teamCount = new Set(athleteList.map((athlete) => athlete.sport)).size;
+  const reportSeries = reportSeriesByPeriod[reportPeriod];
+  const reportAverage = Math.round(
+    reportSeries.reduce((total, item) => total + item.attendance, 0) / reportSeries.length,
+  );
+  const reportPeak = reportSeries.reduce((best, item) =>
+    item.attendance > best.attendance ? item : best,
+  );
+  const reportTargetOptions =
+    reportScope === 'Individual'
+      ? athleteList.map((athlete) => athlete.name)
+      : reportGroupsByScope[reportScope];
   const metrics = [
     { label: 'Deportistas cargados', value: String(athleteList.length) },
     { label: 'Asistencia de hoy', value: `${attendancePercentage}%` },
@@ -259,6 +345,13 @@ function App({ googleClientIdConfigured }: AppProps) {
     setSaveMessage(`${trimmedName} fue cargado correctamente.`);
   };
 
+  const handleReportScopeChange = (scope: ReportScope) => {
+    setReportScope(scope);
+    setReportTarget(
+      scope === 'Individual' ? athleteList[0]?.name ?? '' : reportGroupsByScope[scope][0],
+    );
+  };
+
   if (!user) {
     return (
       <LoginScreen
@@ -281,6 +374,7 @@ function App({ googleClientIdConfigured }: AppProps) {
         <div className="nav-links">
           <a href="#asistencia">Asistencia</a>
           <a href="#carga-datos">Carga</a>
+          <a href="#reportes">Reportes</a>
           <a href="#equipos">Equipos</a>
           <a href="#sesiones">Sesiones</a>
         </div>
@@ -314,6 +408,9 @@ function App({ googleClientIdConfigured }: AppProps) {
             </a>
             <a className="secondary-button" href="#carga-datos">
               Cargar datos
+            </a>
+            <a className="secondary-button" href="#reportes">
+              Ver reportes
             </a>
           </div>
         </div>
@@ -354,7 +451,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           <p className="eyebrow">Carga de datos</p>
           <h2 id="data-entry-title">Registrar asistencia de deportistas</h2>
           <p>
-            Carga un deportista, asignale deporte o equipo y marca su estado para que el
+            Carga un deportista, asignale deporte y marca su asistencia para que el
             tablero se actualice al instante.
           </p>
         </div>
@@ -389,7 +486,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
-            Estado
+            Asistencia
             <select
               value={newAthlete.status}
               onChange={(event) =>
@@ -415,8 +512,8 @@ function App({ googleClientIdConfigured }: AppProps) {
         <div className="data-table" aria-label="Registros cargados">
           <div className="data-table-header">
             <span>Deportista</span>
-            <span>Deporte/equipo</span>
-            <span>Estado</span>
+            <span>Deporte</span>
+            <span>Asistencia</span>
           </div>
           {athleteList.map((athlete) => (
             <article className="data-table-row" key={athlete.id}>
@@ -428,6 +525,97 @@ function App({ googleClientIdConfigured }: AppProps) {
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="report-panel" id="reportes" aria-labelledby="report-title">
+        <div className="section-heading">
+          <p className="eyebrow">Reportes</p>
+          <h2 id="report-title">Ejemplo de reporte de asistencia</h2>
+          <p>
+            Este ejemplo muestra como Sportia puede medir asistencia por deportista o de forma
+            general para toda una división, equipo o camada.
+          </p>
+        </div>
+
+        <div className="report-filters" aria-label="Filtros de reporte">
+          <label>
+            Periodo
+            <select
+              value={reportPeriod}
+              onChange={(event) => setReportPeriod(event.target.value as ReportPeriod)}
+            >
+              {reportPeriods.map((period) => (
+                <option value={period} key={period}>
+                  {period}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Alcance
+            <select
+              value={reportScope}
+              onChange={(event) => handleReportScopeChange(event.target.value as ReportScope)}
+            >
+              {reportScopes.map((scope) => (
+                <option value={scope} key={scope}>
+                  {scope}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            {reportScope === 'Individual' ? 'Deportista' : reportScope}
+            <select value={reportTarget} onChange={(event) => setReportTarget(event.target.value)}>
+              {reportTargetOptions.map((target) => (
+                <option value={target} key={target}>
+                  {target}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="report-summary">
+          <article>
+            <span>Reporte</span>
+            <strong>
+              {reportPeriod} · {reportTarget}
+            </strong>
+          </article>
+          <article>
+            <span>Promedio</span>
+            <strong>{reportAverage}%</strong>
+          </article>
+          <article>
+            <span>Mejor marca</span>
+            <strong>
+              {reportPeak.attendance}% en {reportPeak.label}
+            </strong>
+          </article>
+        </div>
+
+        <div className="chart-card" aria-label={`Gráfico de asistencia ${reportPeriod}`}>
+          <div className="chart-grid" aria-hidden="true">
+            {reportSeries.map((item) => (
+              <div className="chart-column" key={`${reportPeriod}-${item.label}`}>
+                <span className="chart-value">{item.attendance}%</span>
+                <div className="chart-track">
+                  <span className="chart-bar" style={{ height: `${item.attendance}%` }} />
+                </div>
+                <span className="chart-label">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="report-note">
+          Ejemplo: si elegís <strong>Individual</strong>, el gráfico muestra el rendimiento de un
+          deportista. Si elegís <strong>División</strong>, <strong>Equipo</strong> o{' '}
+          <strong>Camada</strong>, muestra el consolidado del grupo seleccionado.
+        </p>
       </section>
 
       <section className="content-grid">
