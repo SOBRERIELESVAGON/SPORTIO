@@ -191,13 +191,12 @@ function ratio(attended: number, total: number) {
 }
 
 function calculateRankingScore(athlete: Athlete) {
-  const trainingScore = ratio(athlete.trainingsAttended, athlete.trainingsTotal) * 45;
-  const matchScore = ratio(athlete.matchesAttended, athlete.matchesTotal) * 30;
-  const tourScore = ratio(athlete.toursAttended, athlete.toursTotal) * 15;
-  const hostingScore = (athlete.stayedAsGuest ? 5 : 0) + (athlete.hostedGuest ? 5 : 0);
-  const medalBonus = athlete.perfectAttendance30Days ? 10 : 0;
+  const trainingScore = ratio(athlete.trainingsAttended, athlete.trainingsTotal) * 10;
+  const matchScore = ratio(athlete.matchesAttended, athlete.matchesTotal) * 10;
+  const tourScore = ratio(athlete.toursAttended, athlete.toursTotal) * 10;
+  const hostingScore = (athlete.stayedAsGuest ? 20 : 0) + (athlete.hostedGuest ? 20 : 0);
 
-  return Math.round(trainingScore + matchScore + tourScore + hostingScore + medalBonus);
+  return Math.round(trainingScore + matchScore + tourScore + hostingScore);
 }
 
 function csvCell(value: string | number) {
@@ -1018,7 +1017,8 @@ function App({ googleClientIdConfigured }: AppProps) {
           <h2 id="ranking-title">Ranking por asistencia y compromiso</h2>
           <p>
             Visible para todos los usuarios. Ordena jugadores que comparten camada, edad o equipo,
-            considerando entrenamientos, partidos, giras, si se hospeda y si hospeda a otro jugador.
+            sumando 10 pts por entrenamientos, 10 pts por partidos, 10 pts por viaje/gira,
+            20 pts si se aloja y 20 pts si hospeda/recibe.
           </p>
         </div>
 
@@ -1081,9 +1081,9 @@ function App({ googleClientIdConfigured }: AppProps) {
               <div className="ranking-breakdown">
                 <span>Entr. {athlete.trainingsAttended}/{athlete.trainingsTotal}</span>
                 <span>Part. {athlete.matchesAttended}/{athlete.matchesTotal}</span>
-                <span>Giras {athlete.toursAttended}/{athlete.toursTotal}</span>
-                <span>{athlete.stayedAsGuest ? 'Se aloja' : 'No se aloja'}</span>
-                <span>{athlete.hostedGuest ? 'Hospeda/recibe' : 'No hospeda'}</span>
+                <span>Viaje {athlete.toursAttended}/{athlete.toursTotal}</span>
+                <span>{athlete.stayedAsGuest ? '+20 se aloja' : 'No se aloja'}</span>
+                <span>{athlete.hostedGuest ? '+20 hospeda/recibe' : 'No hospeda'}</span>
               </div>
               <strong className="ranking-score">{score} pts</strong>
             </article>

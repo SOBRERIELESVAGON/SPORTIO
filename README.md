@@ -12,7 +12,7 @@ App de asistencia a entrenamientos deportivos multi-deporte.
 - Medalla por asistencia perfecta de 30 dias en ficha y reportes.
 - Control operativo de asistencia para entrenamiento o partido con todos presentes por defecto.
 - Control separado de giras para marcar ausentes, jugadores que se alojan y jugadores que hospedan/reciben.
-- Ranking publico por camada, edad o equipo considerando entrenamientos, partidos, giras y hospedaje.
+- Ranking publico por camada, edad o equipo con 10 pts por entrenamiento, 10 pts por partido, 10 pts por viaje, 20 pts si se aloja y 20 pts si hospeda/recibe.
 - Reportes de asistencia con ejemplo diario, semanal, mensual, bimestral, trimestral, semestral y anual.
 - Vista de reportes por deporte, individual y general por division, equipo o camada.
 - Control de vista por rol: usuarios ven ranking; staff y coordinacion ven carga/reportes internos.
