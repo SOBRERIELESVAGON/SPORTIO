@@ -1044,6 +1044,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>(
     'idle',
   );
+  const [selectedDeleteIds, setSelectedDeleteIds] = useState<number[]>([]);
+  const [athleteUndoStack, setAthleteUndoStack] = useState<Athlete[][]>([]);
   const [attendanceActivity, setAttendanceActivity] =
     useState<AttendanceActivity>('Entrenamiento');
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Semanal');
@@ -1563,6 +1565,110 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         athlete.id === athleteId ? { ...athlete, ...updates } : athlete,
       ),
     );
+  };
+
+  const visibleSelectedDeleteIds = selectedDeleteIds.filter((id) =>
+    athletesForView.some((athlete) => athlete.id === id),
+  );
+  const allVisibleSelected =
+    athletesForView.length > 0 &&
+    athletesForView.every((athlete) => selectedDeleteIds.includes(athlete.id));
+
+  const removeAthletes = (ids: number[]) => {
+    const uniqueIds = Array.from(new Set(ids));
+
+    if (uniqueIds.length === 0) {
+      return;
+    }
+
+    const removedAthletes = athleteList.filter((athlete) => uniqueIds.includes(athlete.id));
+
+    if (removedAthletes.length === 0) {
+      return;
+    }
+
+    setAthleteUndoStack((currentStack) => [...currentStack.slice(-19), removedAthletes]);
+    setAthleteList((currentAthletes) =>
+      currentAthletes.filter((athlete) => !uniqueIds.includes(athlete.id)),
+    );
+    setSelectedDeleteIds((currentIds) => currentIds.filter((id) => !uniqueIds.includes(id)));
+
+    if (selectedPlayerId && uniqueIds.includes(selectedPlayerId)) {
+      setSelectedPlayerId(null);
+    }
+
+    setSaveMessage(t('table.deletedCount', { count: removedAthletes.length }));
+  };
+
+  const togglePlayerSelection = (athleteId: number, checked: boolean) => {
+    setSelectedDeleteIds((currentIds) =>
+      checked
+        ? currentIds.includes(athleteId)
+          ? currentIds
+          : [...currentIds, athleteId]
+        : currentIds.filter((id) => id !== athleteId),
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = athletesForView.map((athlete) => athlete.id);
+
+    if (allVisibleSelected) {
+      setSelectedDeleteIds((currentIds) =>
+        currentIds.filter((id) => !visibleIds.includes(id)),
+      );
+      return;
+    }
+
+    setSelectedDeleteIds((currentIds) => Array.from(new Set([...currentIds, ...visibleIds])));
+  };
+
+  const handleDeleteSelectedPlayers = () => {
+    if (visibleSelectedDeleteIds.length === 0) {
+      return;
+    }
+
+    if (!window.confirm(t('table.confirmDelete', { count: visibleSelectedDeleteIds.length }))) {
+      return;
+    }
+
+    removeAthletes(visibleSelectedDeleteIds);
+  };
+
+  const handleDeleteAllVisiblePlayers = () => {
+    const visibleIds = athletesForView.map((athlete) => athlete.id);
+
+    if (visibleIds.length === 0) {
+      return;
+    }
+
+    if (!window.confirm(t('table.confirmDeleteAll', { count: visibleIds.length }))) {
+      return;
+    }
+
+    removeAthletes(visibleIds);
+  };
+
+  const handleDeletePlayer = (athleteId: number) => {
+    removeAthletes([athleteId]);
+  };
+
+  const undoLastPlayerDeletion = () => {
+    if (athleteUndoStack.length === 0) {
+      setSaveMessage(t('table.nothingToUndo'));
+      return;
+    }
+
+    const lastBatch = athleteUndoStack[athleteUndoStack.length - 1];
+    const existingIds = new Set(athleteList.map((athlete) => athlete.id));
+    const athletesToRestore = lastBatch.filter((athlete) => !existingIds.has(athlete.id));
+
+    if (athletesToRestore.length > 0) {
+      setAthleteList((currentAthletes) => [...athletesToRestore, ...currentAthletes]);
+    }
+
+    setAthleteUndoStack((currentStack) => currentStack.slice(0, -1));
+    setSaveMessage(t('table.restoredCount', { count: athletesToRestore.length }));
   };
 
   const markAllAttendancePresent = () => {
@@ -2708,6 +2814,45 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
 
         {saveMessage ? <p className="save-message">{saveMessage}</p> : null}
 
+        <div className="data-table-toolbar" aria-label={t('table.managePlayers')}>
+          <label className="inline-checkbox data-table-select-all">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={toggleSelectAllVisible}
+              disabled={athletesForView.length === 0}
+            />
+            {t('table.selectAll')}
+          </label>
+          <span className="data-table-selection-count">
+            {t('table.selectedCount', { count: visibleSelectedDeleteIds.length })}
+          </span>
+          <button
+            className="export-button danger-button"
+            type="button"
+            disabled={visibleSelectedDeleteIds.length === 0}
+            onClick={handleDeleteSelectedPlayers}
+          >
+            {t('table.deleteSelected')}
+          </button>
+          <button
+            className="export-button danger-button"
+            type="button"
+            disabled={athletesForView.length === 0}
+            onClick={handleDeleteAllVisiblePlayers}
+          >
+            {t('table.deleteAllVisible')}
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={athleteUndoStack.length === 0}
+            onClick={undoLastPlayerDeletion}
+          >
+            {t('table.undoDelete')}
+          </button>
+        </div>
+
         <div
           className="data-table"
           id="jugadores-registrados"
@@ -2715,15 +2860,25 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           aria-label={t('table.loadedRecords')}
         >
           <div className="data-table-header">
+            <span>{t('table.select')}</span>
             <span>{t('profile.memberNumber')}</span>
             <span>{t('table.player')}</span>
             <span>{t('profile.dni')}</span>
             <span>{t('profile.sport')}</span>
             <span>{t('table.medal30')}</span>
             <span>{t('profile.attendance')}</span>
+            <span>{t('table.actions')}</span>
           </div>
           {athletesForView.map((athlete) => (
             <article className="data-table-row" key={athlete.id}>
+              <label className="inline-checkbox data-table-row-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedDeleteIds.includes(athlete.id)}
+                  onChange={(event) => togglePlayerSelection(athlete.id, event.target.checked)}
+                  aria-label={t('table.selectPlayer', { name: getAthleteFullName(athlete) })}
+                />
+              </label>
               <span>{athlete.memberNumber || '-'}</span>
               <strong>{getAthleteFullName(athlete)}</strong>
               <span>{athlete.dni}</span>
@@ -2736,6 +2891,14 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
               <span className={`status status-${athlete.status.toLowerCase()}`}>
                 {translateAttendanceStatus(selectedLanguage, athlete.status)}
               </span>
+              <button
+                className="delete-player-button"
+                type="button"
+                onClick={() => handleDeletePlayer(athlete.id)}
+                aria-label={t('table.deleteOne', { name: getAthleteFullName(athlete) })}
+              >
+                {t('table.delete')}
+              </button>
             </article>
           ))}
         </div>
