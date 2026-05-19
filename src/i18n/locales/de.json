@@ -165,7 +165,7 @@
   "import.previewAlt": "Vorschau der geladenen Registerkarte",
   "import.previewCaption": "Blattvorschau",
   "import.noValidRows": "Keine gültigen Zeilen gefunden.Laden Sie die Vorlage herunter und geben Sie Nachname, Vorname und ID ein.",
-  "import.success": "{count} Spieler wurden importiert.",
+  "import.success": "File \"{name}\" loaded: {count} player(s) imported.",
   "import.skipped": "{count} Zeile(n) wurden aufgrund unvollständiger Daten übersprungen.",
   "import.fileError": "Das Formular konnte nicht gelesen werden.Stellen Sie sicher, dass es mit Excel (.xlsx, .xls) oder CSV kompatibel ist.",
   "import.selectPhoto": "Wählen Sie ein Foto aus der Datei aus, bevor Sie die Daten extrahieren.",
@@ -278,5 +278,8 @@
   "master.googleAds.clientOk": "Publisher ID configured in .env",
   "master.googleAds.clientMissing": "Add VITE_GOOGLE_ADSENSE_CLIENT to .env",
   "master.googleAds.testMode": "Test mode enabled (VITE_GOOGLE_ADSENSE_TEST=true)",
-  "import.missingColumns": "The spreadsheet must include Last name and First name columns (any case)."
+  "import.missingColumns": "The spreadsheet must include Last name and First name columns (any case).",
+  "import.fileReceived": "File \"{name}\" received. Reading spreadsheet...",
+  "import.fileProcessing": "Processing \"{name}\"...",
+  "import.fileReady": "Last file: {name}"
 }

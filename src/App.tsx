@@ -912,6 +912,11 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const spreadsheetInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const playersTableRef = useRef<HTMLDivElement>(null);
+  const [spreadsheetFileName, setSpreadsheetFileName] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>(
+    'idle',
+  );
   const [attendanceActivity, setAttendanceActivity] =
     useState<AttendanceActivity>('Entrenamiento');
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Semanal');
@@ -1172,6 +1177,12 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     }
   };
 
+  const scrollToPlayersTable = () => {
+    window.setTimeout(() => {
+      playersTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
   const handleSpreadsheetImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
@@ -1179,8 +1190,11 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       return;
     }
 
+    setSpreadsheetFileName(file.name);
     setImportLoading(true);
-    setImportMessage(null);
+    setImportStatus('processing');
+    setImportMessage(t('import.fileReceived', { name: file.name }));
+    setSaveMessage(null);
 
     try {
       const { players, skipped, missingRequiredColumns } = await parseSpreadsheetFile(
@@ -1190,22 +1204,29 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       );
 
       if (missingRequiredColumns) {
+        setImportStatus('error');
         setImportMessage(t('import.missingColumns'));
         return;
       }
 
       if (players.length === 0) {
+        setImportStatus('error');
         setImportMessage(t('import.noValidRows'));
         return;
       }
 
       addImportedPlayers(players);
-      setImportMessage(
-        t('import.success', { count: players.length }) +
-          (skipped > 0 ? t('import.skipped', { count: skipped }) : ''),
-      );
-      setSaveMessage(null);
+
+      const successText =
+        t('import.success', { count: players.length, name: file.name }) +
+        (skipped > 0 ? t('import.skipped', { count: skipped }) : '');
+
+      setImportStatus('success');
+      setImportMessage(successText);
+      setSaveMessage(successText);
+      scrollToPlayersTable();
     } catch {
+      setImportStatus('error');
       setImportMessage(t('import.fileError'));
     } finally {
       setImportLoading(false);
@@ -2035,6 +2056,13 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                   hidden
                   onChange={handleSpreadsheetImport}
                 />
+                {spreadsheetFileName ? (
+                  <p className="import-file-name">
+                    {importLoading
+                      ? t('import.fileProcessing', { name: spreadsheetFileName })
+                      : t('import.fileReady', { name: spreadsheetFileName })}
+                  </p>
+                ) : null}
               </article>
 
               <article className="import-card">
@@ -2079,7 +2107,21 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
               </article>
             </div>
 
-            {importMessage ? <p className="import-message">{importMessage}</p> : null}
+            {importMessage ? (
+              <p
+                className={`import-message ${
+                  importStatus === 'success'
+                    ? 'import-message-success'
+                    : importStatus === 'error'
+                      ? 'import-message-error'
+                      : ''
+                }`}
+                role="status"
+                aria-live="polite"
+              >
+                {importMessage}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -2475,7 +2517,12 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
 
         {saveMessage ? <p className="save-message">{saveMessage}</p> : null}
 
-        <div className="data-table" aria-label={t('table.loadedRecords')}>
+        <div
+          className="data-table"
+          id="jugadores-registrados"
+          ref={playersTableRef}
+          aria-label={t('table.loadedRecords')}
+        >
           <div className="data-table-header">
             <span>{t('profile.memberNumber')}</span>
             <span>{t('table.player')}</span>

@@ -165,7 +165,7 @@
   "import.previewAlt": "Anteprima della scheda caricata",
   "import.previewCaption": "Anteprima del foglio",
   "import.noValidRows": "Nessuna riga valida trovata.Scarica il modello e completa cognome, nome e ID.",
-  "import.success": "{count} giocatori sono stati importati.",
+  "import.success": "File \"{name}\" loaded: {count} player(s) imported.",
   "import.skipped": "{count} righe sono state saltate a causa di dati incompleti.",
   "import.fileError": "Impossibile leggere il modulo.Verifica che sia compatibile con Excel (.xlsx, .xls) o CSV.",
   "import.selectPhoto": "Seleziona una foto dal file prima di estrarre i dati.",
@@ -278,5 +278,8 @@
   "master.googleAds.clientOk": "Publisher ID configured in .env",
   "master.googleAds.clientMissing": "Add VITE_GOOGLE_ADSENSE_CLIENT to .env",
   "master.googleAds.testMode": "Test mode enabled (VITE_GOOGLE_ADSENSE_TEST=true)",
-  "import.missingColumns": "The spreadsheet must include Last name and First name columns (any case)."
+  "import.missingColumns": "The spreadsheet must include Last name and First name columns (any case).",
+  "import.fileReceived": "File \"{name}\" received. Reading spreadsheet...",
+  "import.fileProcessing": "Processing \"{name}\"...",
+  "import.fileReady": "Last file: {name}"
 }

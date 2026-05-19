@@ -1029,6 +1029,23 @@ button {
   line-height: 1.5;
 }
 
+.import-message-success {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.import-message-error {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.import-file-name {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #486154;
+  font-weight: 800;
+}
+
 .import-photo-preview {
   display: grid;
   gap: 8px;

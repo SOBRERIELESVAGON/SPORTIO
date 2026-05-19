@@ -165,7 +165,7 @@
   "import.previewAlt": "Vista prèvia de la fitxa carregada",
   "import.previewCaption": "Vista prèvia de la fitxa",
   "import.noValidRows": "No es van trobar files vàlides.Descarrega la plantilla i completa cognom, nom i DNI.",
-  "import.success": "S'han importat {count} jugador(s).",
+  "import.success": "File \"{name}\" loaded: {count} player(s) imported.",
   "import.skipped": "{count} fila(s) es van ometre per dades incomplets.",
   "import.fileError": "No s'ha pogut llegir la planeta.Verifiqueu que sigui Excel (.xlsx, .xls) o CSV compatible.",
   "import.selectPhoto": "Seleccioneu una fotografia de la fitxa abans d'extreure'n les dades.",
@@ -278,5 +278,8 @@
   "master.googleAds.clientOk": "Publisher ID configured in .env",
   "master.googleAds.clientMissing": "Add VITE_GOOGLE_ADSENSE_CLIENT to .env",
   "master.googleAds.testMode": "Test mode enabled (VITE_GOOGLE_ADSENSE_TEST=true)",
-  "import.missingColumns": "The spreadsheet must include Last name and First name columns (any case)."
+  "import.missingColumns": "The spreadsheet must include Last name and First name columns (any case).",
+  "import.fileReceived": "File \"{name}\" received. Reading spreadsheet...",
+  "import.fileProcessing": "Processing \"{name}\"...",
+  "import.fileReady": "Last file: {name}"
 }

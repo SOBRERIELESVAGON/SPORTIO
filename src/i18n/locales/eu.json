@@ -165,7 +165,7 @@
   "import.previewAlt": "Kargatutako fitxaren aurrebista",
   "import.previewCaption": "Orriaren aurrebista",
   "import.noValidRows": "Ez da baliozko errenkadarik aurkitu.Deskargatu txantiloia eta osatu abizenak, izena eta NAN.",
-  "import.success": "{count} jokalari inportatu dira.",
+  "import.success": "File \"{name}\" loaded: {count} player(s) imported.",
   "import.skipped": "{count} errenkada saltatu dira datu osatu gabe daudelako.",
   "import.fileError": "Ezin izan da inprimakia irakurri.Egiaztatu Excel (.xlsx, .xls) edo CSV bateragarria dela.",
   "import.selectPhoto": "Hautatu fitxategiko argazki bat datuak atera aurretik.",
@@ -278,5 +278,8 @@
   "master.googleAds.clientOk": "Publisher ID configured in .env",
   "master.googleAds.clientMissing": "Add VITE_GOOGLE_ADSENSE_CLIENT to .env",
   "master.googleAds.testMode": "Test mode enabled (VITE_GOOGLE_ADSENSE_TEST=true)",
-  "import.missingColumns": "The spreadsheet must include Last name and First name columns (any case)."
+  "import.missingColumns": "The spreadsheet must include Last name and First name columns (any case).",
+  "import.fileReceived": "File \"{name}\" received. Reading spreadsheet...",
+  "import.fileProcessing": "Processing \"{name}\"...",
+  "import.fileReady": "Last file: {name}"
 }

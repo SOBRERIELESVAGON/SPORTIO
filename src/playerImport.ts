@@ -112,11 +112,50 @@ const headerFieldMap: Record<string, keyof PlayerImportData> = {
 
 function normalizeHeader(value: string) {
   return value
+    .replace(/^\uFEFF/, '')
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .toLowerCase()
     .trim()
     .replace(/\s+/g, ' ');
+}
+
+function detectCsvDelimiter(text: string) {
+  const firstLine = text.split(/\r?\n/).find((line) => line.trim()) ?? '';
+  const semicolons = (firstLine.match(/;/g) ?? []).length;
+  const commas = (firstLine.match(/,/g) ?? []).length;
+
+  return semicolons >= commas ? ';' : ',';
+}
+
+function readWorkbookFromFile(buffer: ArrayBuffer, fileName: string) {
+  const lowerName = fileName.toLowerCase();
+
+  if (lowerName.endsWith('.csv')) {
+    const text = new TextDecoder('utf-8').decode(buffer);
+
+    return XLSX.read(text, {
+      type: 'string',
+      FS: detectCsvDelimiter(text),
+      raw: false,
+    });
+  }
+
+  return XLSX.read(buffer, { type: 'array', cellDates: true });
+}
+
+function findHeaderRowIndex(rows: unknown[][]) {
+  const limit = Math.min(rows.length, 15);
+
+  for (let index = 0; index < limit; index += 1) {
+    const headers = (rows[index] ?? []).map((cell) => cellToString(cell));
+
+    if (hasRequiredImportColumns(headers)) {
+      return index;
+    }
+  }
+
+  return -1;
 }
 
 function cellToString(value: unknown) {
@@ -332,7 +371,7 @@ export async function parseSpreadsheetFile(
   sportOptions: string[],
 ): Promise<SpreadsheetImportResult> {
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const workbook = readWorkbookFromFile(buffer, file.name);
   const sheetName = workbook.SheetNames[0];
 
   if (!sheetName) {
@@ -349,16 +388,17 @@ export async function parseSpreadsheetFile(
     return { players: [], skipped: 0, missingRequiredColumns: false };
   }
 
-  const headers = (rows[0] ?? []).map((cell) => cellToString(cell));
+  const headerRowIndex = findHeaderRowIndex(rows);
 
-  if (!hasRequiredImportColumns(headers)) {
+  if (headerRowIndex < 0) {
     return { players: [], skipped: 0, missingRequiredColumns: true };
   }
 
+  const headers = (rows[headerRowIndex] ?? []).map((cell) => cellToString(cell));
   const players: PlayerImportData[] = [];
   let skipped = 0;
 
-  rows.slice(1).forEach((row) => {
+  rows.slice(headerRowIndex + 1).forEach((row) => {
     if (!Array.isArray(row) || row.every((cell) => !cellToString(cell))) {
       return;
     }
