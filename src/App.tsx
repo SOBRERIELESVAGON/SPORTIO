@@ -82,23 +82,40 @@ type AppProps = {
 const sportOptions = [
   'Fútbol',
   'Rugby',
-  'Baloncesto',
-  'Voleibol',
+  'Básquet',
+  'Vóley',
   'Hockey sobre césped',
-  'Cricket',
-  'Otro',
+  'Handball',
+  'Futsal',
   'Hockey sobre hielo',
   'Waterpolo',
-  'Ultimate frisbee',
-  'Beisbol',
-  'Softbol',
+  'Béisbol',
+  'Sóftbol',
   'Fútbol americano',
   'Polo',
-  'Futsal',
   'Lacrosse',
+  'Cricket',
+  'Ultimate frisbee',
+  'Tenis',
+  'Pádel',
+  'Atletismo',
+  'Natación',
+  'Ciclismo',
+  'Boxeo',
+  'Judo',
+  'Taekwondo',
+  'Karate',
+  'Gimnasia artística',
+  'Remo',
+  'Canotaje',
+  'Esgrima',
+  'Golf',
 ];
 
 const allSportsReportOption = 'Todos los deportes';
+const rememberedRoleKey = 'sportia.rememberedRole';
+const rememberedPasswordKey = 'sportia.rememberedPassword';
+const preferredSportKey = 'sportia.preferredSport';
 const languageOptions: { code: LanguageCode; label: string }[] = [
   { code: 'es', label: 'Español' },
   { code: 'en', label: 'English' },
@@ -156,7 +173,7 @@ const reportScopes: ReportScope[] = ['General', 'División', 'Equipo', 'Camada',
 const reportGroupsByScope: Record<Exclude<ReportScope, 'Individual'>, string[]> = {
   General: ['Toda la institución'],
   División: ['Sub 14', 'Sub 16', 'Sub 18', 'Primera'],
-  Equipo: ['Fútbol Sub 16', 'Rugby M17', 'Voleibol mixto', 'Baloncesto femenino'],
+  Equipo: ['Fútbol Sub 16', 'Rugby M17', 'Vóley mixto', 'Básquet femenino'],
   Camada: ['Camada 2008', 'Camada 2009', 'Camada 2010', 'Camada 2011'],
 };
 
@@ -253,6 +270,30 @@ function numberFromForm(value: string) {
   return Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
 }
 
+function readStoredValue(key: string) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredValue(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Local storage can be unavailable in private browsing or restricted contexts.
+  }
+}
+
+function removeStoredValue(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Local storage can be unavailable in private browsing or restricted contexts.
+  }
+}
+
 function LanguageSelector({
   selectedLanguage,
   onLanguageChange,
@@ -270,6 +311,27 @@ function LanguageSelector({
         {languageOptions.map((language) => (
           <option value={language.code} key={language.code}>
             {language.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SportPreferenceSelector({
+  selectedSport,
+  onSportChange,
+}: {
+  selectedSport: string;
+  onSportChange: (sport: string) => void;
+}) {
+  return (
+    <label className="sport-preference-selector">
+      Deporte fijo
+      <select value={selectedSport} onChange={(event) => onSportChange(event.target.value)}>
+        {sportOptions.map((sport) => (
+          <option value={sport} key={sport}>
+            {sport}
           </option>
         ))}
       </select>
@@ -374,8 +436,8 @@ const initialAthletes: Athlete[] = [
     memberStatus: 'Activo',
     membershipType: 'Jugador juvenil',
     nextBillingDate: '30/04/2026',
-    sport: 'Baloncesto',
-    team: 'Baloncesto Sub 15',
+    sport: 'Básquet',
+    team: 'Básquet Sub 15',
     cohort: 'Camada 2010',
     perfectAttendance30Days: false,
     trainingsAttended: 9,
@@ -407,8 +469,8 @@ const initialAthletes: Athlete[] = [
     memberStatus: 'Activo',
     membershipType: 'Jugadora juvenil',
     nextBillingDate: '30/04/2026',
-    sport: 'Voleibol',
-    team: 'Voleibol Sub 13',
+    sport: 'Vóley',
+    team: 'Vóley Sub 13',
     cohort: 'Camada 2012',
     perfectAttendance30Days: false,
     trainingsAttended: 8,
@@ -472,25 +534,37 @@ function LoginScreen({
   onStaffAccess,
   onGoogleError,
   onLanguageChange,
+  onPreferredSportChange,
+  preferredSport,
   selectedLanguage,
 }: {
   error: string | null;
   athletes: Athlete[];
   googleClientIdConfigured: boolean;
   onPlayerAccess: (athleteId: number) => void;
-  onStaffAccess: (role: ProtectedRole, password: string) => void;
+  onStaffAccess: (role: ProtectedRole, password: string, rememberPassword: boolean) => void;
   onGoogleError: () => void;
   onLanguageChange: (language: LanguageCode) => void;
+  onPreferredSportChange: (sport: string) => void;
+  preferredSport: string;
   selectedLanguage: LanguageCode;
 }) {
-  const [staffRole, setStaffRole] = useState<ProtectedRole>('Staff');
-  const [staffPassword, setStaffPassword] = useState('');
+  const [staffRole, setStaffRole] = useState<ProtectedRole>(() => {
+    const savedRole = readStoredValue(rememberedRoleKey);
+
+    return protectedRoles.includes(savedRole as ProtectedRole) ? (savedRole as ProtectedRole) : 'Staff';
+  });
+  const [staffPassword, setStaffPassword] = useState(() => readStoredValue(rememberedPasswordKey) ?? '');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberPassword, setRememberPassword] = useState(() =>
+    Boolean(readStoredValue(rememberedPasswordKey)),
+  );
   const [selectedAthleteId, setSelectedAthleteId] = useState(athletes[0]?.id ?? 0);
   const [googleIdentity, setGoogleIdentity] = useState<string | null>(null);
 
   const handleStaffSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onStaffAccess(staffRole, staffPassword);
+    onStaffAccess(staffRole, staffPassword, rememberPassword);
   };
 
   const handleGoogleSuccess = (response: CredentialResponse) => {
@@ -525,6 +599,10 @@ function LoginScreen({
             selectedLanguage={selectedLanguage}
             onLanguageChange={onLanguageChange}
           />
+          <SportPreferenceSelector
+            selectedSport={preferredSport}
+            onSportChange={onPreferredSportChange}
+          />
         </div>
 
         <div>
@@ -553,12 +631,30 @@ function LoginScreen({
 
           <label>
             Clave
+            <div className="password-field">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={staffPassword}
+                onChange={(event) => setStaffPassword(event.target.value)}
+                placeholder="Ingresá la clave"
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? 'Ocultar clave' : 'Ver clave'}
+                onClick={() => setShowPassword((currentValue) => !currentValue)}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
+          </label>
+
+          <label className="remember-password-field">
             <input
-              type="password"
-              value={staffPassword}
-              onChange={(event) => setStaffPassword(event.target.value)}
-              placeholder="Ingresá la clave"
+              type="checkbox"
+              checked={rememberPassword}
+              onChange={(event) => setRememberPassword(event.target.checked)}
             />
+            Guardar permanentemente esta clave en este navegador
           </label>
 
           <button className="demo-button" type="submit">
@@ -629,6 +725,11 @@ function LoginScreen({
 function App({ googleClientIdConfigured }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('es');
+  const [preferredSport, setPreferredSport] = useState(() => {
+    const storedSport = readStoredValue(preferredSportKey);
+
+    return storedSport && sportOptions.includes(storedSport) ? storedSport : sportOptions[0];
+  });
   const [userRole, setUserRole] = useState<UserRole>('Jugador');
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -651,7 +752,7 @@ function App({ googleClientIdConfigured }: AppProps) {
     memberStatus: 'Activo' as Athlete['memberStatus'],
     membershipType: '',
     nextBillingDate: '',
-    sport: sportOptions[0],
+    sport: preferredSport,
     team: '',
     cohort: '',
     perfectAttendance30Days: false,
@@ -669,7 +770,7 @@ function App({ googleClientIdConfigured }: AppProps) {
   const [attendanceActivity, setAttendanceActivity] =
     useState<AttendanceActivity>('Entrenamiento');
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Semanal');
-  const [reportSport, setReportSport] = useState(allSportsReportOption);
+  const [reportSport, setReportSport] = useState(preferredSport);
   const [reportScope, setReportScope] = useState<ReportScope>('General');
   const [reportTarget, setReportTarget] = useState(reportGroupsByScope.General[0]);
   const presentCount = athleteList.filter((athlete) => athlete.status === 'Presente').length;
@@ -697,7 +798,7 @@ function App({ googleClientIdConfigured }: AppProps) {
       : ['Sin deportistas cargados'];
   const reportTargetOptions =
     reportScope === 'Individual' ? individualReportTargets : reportGroupsByScope[reportScope];
-  const [rankingSport, setRankingSport] = useState(allSportsReportOption);
+  const [rankingSport, setRankingSport] = useState(preferredSport);
   const [rankingScope, setRankingScope] = useState<(typeof rankingScopes)[number]>('Camada');
   const rankingCandidates =
     rankingSport === allSportsReportOption
@@ -767,10 +868,18 @@ function App({ googleClientIdConfigured }: AppProps) {
     { label: 'Promedio ranking', value: `${averageRankingScore} pts` },
   ];
 
-  const handleStaffAccess = (role: ProtectedRole, password: string) => {
+  const handleStaffAccess = (role: ProtectedRole, password: string, rememberPassword: boolean) => {
     if (rolePasswords[role] !== password) {
       setAuthError('Clave incorrecta para el rol seleccionado.');
       return;
+    }
+
+    if (rememberPassword) {
+      writeStoredValue(rememberedRoleKey, role);
+      writeStoredValue(rememberedPasswordKey, password);
+    } else {
+      removeStoredValue(rememberedRoleKey);
+      removeStoredValue(rememberedPasswordKey);
     }
 
     setUser({
@@ -780,6 +889,14 @@ function App({ googleClientIdConfigured }: AppProps) {
     setUserRole(role);
     setSelectedPlayerId(null);
     setAuthError(null);
+  };
+
+  const handlePreferredSportChange = (sport: string) => {
+    setPreferredSport(sport);
+    writeStoredValue(preferredSportKey, sport);
+    setReportSport(sport);
+    setRankingSport(sport);
+    setNewAthlete((currentAthlete) => ({ ...currentAthlete, sport }));
   };
 
   const handlePlayerAccess = (athleteId: number) => {
@@ -865,7 +982,7 @@ function App({ googleClientIdConfigured }: AppProps) {
       memberStatus: 'Activo',
       membershipType: '',
       nextBillingDate: '',
-      sport: sportOptions[0],
+      sport: preferredSport,
       team: '',
       cohort: '',
       perfectAttendance30Days: false,
@@ -1076,8 +1193,10 @@ function App({ googleClientIdConfigured }: AppProps) {
         googleClientIdConfigured={googleClientIdConfigured}
         onGoogleError={() => setAuthError('Google no pudo iniciar sesion. Intentalo otra vez.')}
         onLanguageChange={setSelectedLanguage}
+        onPreferredSportChange={handlePreferredSportChange}
         onPlayerAccess={handlePlayerAccess}
         onStaffAccess={handleStaffAccess}
+        preferredSport={preferredSport}
         selectedLanguage={selectedLanguage}
       />
     );
@@ -1103,6 +1222,10 @@ function App({ googleClientIdConfigured }: AppProps) {
           <LanguageSelector
             selectedLanguage={selectedLanguage}
             onLanguageChange={setSelectedLanguage}
+          />
+          <SportPreferenceSelector
+            selectedSport={preferredSport}
+            onSportChange={handlePreferredSportChange}
           />
           {user.picture ? (
             <img className="user-avatar" src={user.picture} alt="" referrerPolicy="no-referrer" />

@@ -221,7 +221,8 @@ button {
   background: #f3f8f5;
 }
 
-.language-selector {
+.language-selector,
+.sport-preference-selector {
   display: grid;
   gap: 2px;
   color: #667b6f;
@@ -230,7 +231,8 @@ button {
   text-transform: uppercase;
 }
 
-.language-selector select {
+.language-selector select,
+.sport-preference-selector select {
   min-height: 32px;
   border: 1px solid #dce8e1;
   border-radius: 999px;
@@ -245,14 +247,18 @@ button {
 
 .login-language-row {
   display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
   justify-content: flex-end;
 }
 
-.login-language-row .language-selector {
+.login-language-row .language-selector,
+.login-language-row .sport-preference-selector {
   width: min(220px, 100%);
 }
 
-.login-language-row .language-selector select {
+.login-language-row .language-selector select,
+.login-language-row .sport-preference-selector select {
   min-height: 42px;
   border-radius: 14px;
 }
@@ -1157,6 +1163,42 @@ button {
   background: #fbfdfc;
   font: inherit;
   font-weight: 700;
+}
+
+.password-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.password-field input {
+  min-width: 0;
+}
+
+.password-field button {
+  min-width: 52px;
+  border: 1px solid #dce8e1;
+  border-radius: 16px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+
+.remember-password-field {
+  display: flex !important;
+  align-items: center;
+  gap: 10px !important;
+  min-height: auto;
+  color: #486154;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.remember-password-field input {
+  width: 18px;
+  min-height: auto;
+  height: 18px;
+  accent-color: #16a34a;
 }
 
 .player-access-card {

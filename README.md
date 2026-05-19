@@ -20,6 +20,8 @@ App de asistencia a entrenamientos deportivos multi-deporte.
 - Rol Master con clave para ver todo, estadísticas globales y reportes de usuarios.
 - Modelo gratuito para clubes, entrenadores, staff, jugadores y coordinacion, monetizado con espacios publicitarios administrables.
 - Selector de idioma con Español primero y mas de 10 opciones disponibles.
+- Ojo para ver/ocultar clave, opción de recordar clave en el navegador y deporte fijo persistente.
+- Lista de 30 deportes practicados en Argentina, primero deportes de equipo y luego individuales.
 - Indicadores principales de deportistas, equipos y asistencia.
 
 ## Configurar login con Google
