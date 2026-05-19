@@ -302,7 +302,7 @@ function App({ googleClientIdConfigured }: AppProps) {
         <aside className="attendance-card" id="asistencia" aria-label="Resumen de asistencia de hoy">
           <div className="card-header">
             <span>Entrenamiento de hoy</span>
-            <strong>{presentCount}/{athletes.length}</strong>
+            <strong>{presentCount}/{athleteList.length}</strong>
           </div>
           <h2>Lista rapida</h2>
           <div className="athlete-list">
