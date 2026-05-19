@@ -1183,11 +1183,16 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setImportMessage(null);
 
     try {
-      const { players, skipped } = await parseSpreadsheetFile(
+      const { players, skipped, missingRequiredColumns } = await parseSpreadsheetFile(
         file,
         preferredSport,
         sportOptions,
       );
+
+      if (missingRequiredColumns) {
+        setImportMessage(t('import.missingColumns'));
+        return;
+      }
 
       if (players.length === 0) {
         setImportMessage(t('import.noValidRows'));

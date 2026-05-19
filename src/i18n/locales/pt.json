@@ -277,5 +277,6 @@
   "master.googleAds.title": "Google AdSense",
   "master.googleAds.clientOk": "Publisher ID configured in .env",
   "master.googleAds.clientMissing": "Add VITE_GOOGLE_ADSENSE_CLIENT to .env",
-  "master.googleAds.testMode": "Test mode enabled (VITE_GOOGLE_ADSENSE_TEST=true)"
+  "master.googleAds.testMode": "Test mode enabled (VITE_GOOGLE_ADSENSE_TEST=true)",
+  "import.missingColumns": "The spreadsheet must include Last name and First name columns (any case)."
 }

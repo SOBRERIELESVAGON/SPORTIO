@@ -71,7 +71,9 @@ const headerFieldMap: Record<string, keyof PlayerImportData> = {
   'nro socio': 'memberNumber',
   'numero socio': 'memberNumber',
   apellido: 'lastName',
+  apellidos: 'lastName',
   nombre: 'firstName',
+  nombres: 'firstName',
   dni: 'dni',
   documento: 'dni',
   deporte: 'sport',
@@ -252,7 +254,26 @@ function rowToPlayerImportData(
 }
 
 function isValidPlayerRow(player: PlayerImportData) {
-  return Boolean(player.lastName.trim() && player.firstName.trim() && player.dni.trim());
+  return Boolean(player.lastName.trim() && player.firstName.trim());
+}
+
+export function hasRequiredImportColumns(headers: string[]) {
+  let hasLastName = false;
+  let hasFirstName = false;
+
+  headers.forEach((header) => {
+    const field = headerFieldMap[normalizeHeader(header)];
+
+    if (field === 'lastName') {
+      hasLastName = true;
+    }
+
+    if (field === 'firstName') {
+      hasFirstName = true;
+    }
+  });
+
+  return hasLastName && hasFirstName;
 }
 
 export function downloadPlayerImportTemplate() {
@@ -299,17 +320,23 @@ export function downloadPlayerImportTemplate() {
   URL.revokeObjectURL(url);
 }
 
+export type SpreadsheetImportResult = {
+  players: PlayerImportData[];
+  skipped: number;
+  missingRequiredColumns: boolean;
+};
+
 export async function parseSpreadsheetFile(
   file: File,
   defaultSport: string,
   sportOptions: string[],
-): Promise<{ players: PlayerImportData[]; skipped: number }> {
+): Promise<SpreadsheetImportResult> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
   const sheetName = workbook.SheetNames[0];
 
   if (!sheetName) {
-    return { players: [], skipped: 0 };
+    return { players: [], skipped: 0, missingRequiredColumns: false };
   }
 
   const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
@@ -319,10 +346,15 @@ export async function parseSpreadsheetFile(
   });
 
   if (rows.length < 2) {
-    return { players: [], skipped: 0 };
+    return { players: [], skipped: 0, missingRequiredColumns: false };
   }
 
   const headers = (rows[0] ?? []).map((cell) => cellToString(cell));
+
+  if (!hasRequiredImportColumns(headers)) {
+    return { players: [], skipped: 0, missingRequiredColumns: true };
+  }
+
   const players: PlayerImportData[] = [];
   let skipped = 0;
 
@@ -341,7 +373,7 @@ export async function parseSpreadsheetFile(
     players.push(player);
   });
 
-  return { players, skipped };
+  return { players, skipped, missingRequiredColumns: false };
 }
 
 function extractLabeledValue(text: string, labels: string[]) {
