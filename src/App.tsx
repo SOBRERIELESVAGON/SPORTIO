@@ -14,7 +14,19 @@ type ReportScope = 'General' | 'División' | 'Equipo' | 'Camada' | 'Individual';
 
 type Athlete = {
   id: number;
-  name: string;
+  memberNumber: string;
+  lastName: string;
+  firstName: string;
+  dni: string;
+  address: string;
+  birthDate: string;
+  age: string;
+  phone: string;
+  email: string;
+  paymentMethod: string;
+  memberStatus: 'Activo' | 'Inactivo';
+  membershipType: string;
+  nextBillingDate: string;
   sport: string;
   status: AttendanceStatus;
 };
@@ -151,11 +163,87 @@ function buildSportReportSeries(period: ReportPeriod, sport: string) {
   }));
 }
 
+function getAthleteFullName(athlete: Athlete) {
+  return `${athlete.lastName} ${athlete.firstName}`.trim();
+}
+
+function csvCell(value: string | number) {
+  return `"${String(value).replace(/"/g, '""')}"`;
+}
+
 const initialAthletes: Athlete[] = [
-  { id: 1, name: 'Lucia Mendez', sport: 'Fútbol', status: 'Presente' },
-  { id: 2, name: 'Mateo Rojas', sport: 'Baloncesto', status: 'Tarde' },
-  { id: 3, name: 'Sofia Arias', sport: 'Voleibol', status: 'Presente' },
-  { id: 4, name: 'Tomas Silva', sport: 'Rugby', status: 'Ausente' },
+  {
+    id: 1,
+    memberNumber: '4613',
+    lastName: 'MENDIVIL',
+    firstName: 'BENICIO',
+    dni: '60.910.046',
+    address: 'Avenida Paraguay 526, Salta',
+    birthDate: '27/02/2018',
+    age: '8',
+    phone: '3874098343',
+    email: 'natalia.valdez1317@gmail.com',
+    paymentMethod: 'Mercado Pago',
+    memberStatus: 'Activo',
+    membershipType: 'Menor familia',
+    nextBillingDate: '30/04/2026',
+    sport: 'Rugby',
+    status: 'Presente',
+  },
+  {
+    id: 2,
+    memberNumber: '4614',
+    lastName: 'MENDEZ',
+    firstName: 'LUCIA',
+    dni: '54.128.882',
+    address: 'Las Heras 120, Salta',
+    birthDate: '14/08/2011',
+    age: '14',
+    phone: '3875551234',
+    email: 'lucia.mendez@example.com',
+    paymentMethod: 'Transferencia',
+    memberStatus: 'Activo',
+    membershipType: 'Jugador juvenil',
+    nextBillingDate: '30/04/2026',
+    sport: 'Fútbol',
+    status: 'Presente',
+  },
+  {
+    id: 3,
+    memberNumber: '4615',
+    lastName: 'ROJAS',
+    firstName: 'MATEO',
+    dni: '52.443.219',
+    address: 'Belgrano 880, Salta',
+    birthDate: '03/11/2010',
+    age: '15',
+    phone: '3875556778',
+    email: 'mateo.rojas@example.com',
+    paymentMethod: 'Efectivo',
+    memberStatus: 'Activo',
+    membershipType: 'Jugador juvenil',
+    nextBillingDate: '30/04/2026',
+    sport: 'Baloncesto',
+    status: 'Tarde',
+  },
+  {
+    id: 4,
+    memberNumber: '4616',
+    lastName: 'ARIAS',
+    firstName: 'SOFIA',
+    dni: '53.887.102',
+    address: 'San Martin 410, Salta',
+    birthDate: '22/05/2012',
+    age: '13',
+    phone: '3875554321',
+    email: 'sofia.arias@example.com',
+    paymentMethod: 'Debito automatico',
+    memberStatus: 'Activo',
+    membershipType: 'Jugadora juvenil',
+    nextBillingDate: '30/04/2026',
+    sport: 'Voleibol',
+    status: 'Ausente',
+  },
 ];
 
 const sessions: Session[] = [
@@ -298,7 +386,19 @@ function App({ googleClientIdConfigured }: AppProps) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [athleteList, setAthleteList] = useState<Athlete[]>(initialAthletes);
   const [newAthlete, setNewAthlete] = useState({
-    name: '',
+    memberNumber: '',
+    lastName: '',
+    firstName: '',
+    dni: '',
+    address: '',
+    birthDate: '',
+    age: '',
+    phone: '',
+    email: '',
+    paymentMethod: '',
+    memberStatus: 'Activo' as Athlete['memberStatus'],
+    membershipType: '',
+    nextBillingDate: '',
     sport: sportOptions[0],
     status: 'Presente' as AttendanceStatus,
   });
@@ -323,7 +423,7 @@ function App({ googleClientIdConfigured }: AppProps) {
       : athleteList.filter((athlete) => athlete.sport === reportSport);
   const individualReportTargets =
     athletesForReportSport.length > 0
-      ? athletesForReportSport.map((athlete) => athlete.name)
+      ? athletesForReportSport.map((athlete) => getAthleteFullName(athlete))
       : ['Sin deportistas cargados'];
   const reportTargetOptions =
     reportScope === 'Individual' ? individualReportTargets : reportGroupsByScope[reportScope];
@@ -356,24 +456,104 @@ function App({ googleClientIdConfigured }: AppProps) {
   const handleAthleteSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const trimmedName = newAthlete.name.trim();
+    const trimmedFirstName = newAthlete.firstName.trim();
+    const trimmedLastName = newAthlete.lastName.trim();
+    const trimmedDni = newAthlete.dni.trim();
     const trimmedSport = newAthlete.sport.trim();
 
-    if (!trimmedName || !trimmedSport) {
-      setSaveMessage('Completa nombre y deporte para cargar el registro.');
+    if (!trimmedFirstName || !trimmedLastName || !trimmedDni || !trimmedSport) {
+      setSaveMessage('Completa apellido, nombre, DNI y deporte para cargar el registro.');
       return;
     }
 
     const athlete: Athlete = {
       id: Date.now(),
-      name: trimmedName,
+      memberNumber: newAthlete.memberNumber.trim(),
+      lastName: trimmedLastName.toUpperCase(),
+      firstName: trimmedFirstName.toUpperCase(),
+      dni: trimmedDni,
+      address: newAthlete.address.trim(),
+      birthDate: newAthlete.birthDate.trim(),
+      age: newAthlete.age.trim(),
+      phone: newAthlete.phone.trim(),
+      email: newAthlete.email.trim(),
+      paymentMethod: newAthlete.paymentMethod.trim(),
+      memberStatus: newAthlete.memberStatus,
+      membershipType: newAthlete.membershipType.trim(),
+      nextBillingDate: newAthlete.nextBillingDate.trim(),
       sport: trimmedSport,
       status: newAthlete.status,
     };
 
     setAthleteList((currentAthletes) => [athlete, ...currentAthletes]);
-    setNewAthlete({ name: '', sport: sportOptions[0], status: 'Presente' });
-    setSaveMessage(`${trimmedName} fue cargado correctamente.`);
+    setNewAthlete({
+      memberNumber: '',
+      lastName: '',
+      firstName: '',
+      dni: '',
+      address: '',
+      birthDate: '',
+      age: '',
+      phone: '',
+      email: '',
+      paymentMethod: '',
+      memberStatus: 'Activo',
+      membershipType: '',
+      nextBillingDate: '',
+      sport: sportOptions[0],
+      status: 'Presente',
+    });
+    setSaveMessage(
+      `${trimmedLastName.toUpperCase()} ${trimmedFirstName.toUpperCase()} fue cargado correctamente.`,
+    );
+  };
+
+  const exportAthletesToExcel = () => {
+    const headers = [
+      'Nro socio',
+      'Apellido',
+      'Nombre',
+      'DNI',
+      'Deporte',
+      'Asistencia',
+      'Activo',
+      'Domicilio',
+      'Fecha nacimiento',
+      'Edad',
+      'Telefono/Celular',
+      'Email',
+      'Forma de pago',
+      'Tipo socio',
+      'Proximo cobro',
+    ];
+    const rows = athleteList.map((athlete) => [
+      athlete.memberNumber,
+      athlete.lastName,
+      athlete.firstName,
+      athlete.dni,
+      athlete.sport,
+      athlete.status,
+      athlete.memberStatus,
+      athlete.address,
+      athlete.birthDate,
+      athlete.age,
+      athlete.phone,
+      athlete.email,
+      athlete.paymentMethod,
+      athlete.membershipType,
+      athlete.nextBillingDate,
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map((value) => csvCell(value)).join(';'))
+      .join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = 'jugadores-sportia.csv';
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleReportScopeChange = (scope: ReportScope) => {
@@ -392,7 +572,11 @@ function App({ googleClientIdConfigured }: AppProps) {
     setReportSport(sport);
 
     if (reportScope === 'Individual') {
-      setReportTarget(athletesInSelectedSport[0]?.name ?? 'Sin deportistas cargados');
+      setReportTarget(
+        athletesInSelectedSport[0]
+          ? getAthleteFullName(athletesInSelectedSport[0])
+          : 'Sin deportistas cargados',
+      );
     }
   };
 
@@ -469,8 +653,8 @@ function App({ googleClientIdConfigured }: AppProps) {
             {athleteList.slice(0, 5).map((athlete) => (
               <article className="athlete-row" key={athlete.id}>
                 <div>
-                  <strong>{athlete.name}</strong>
-                  <span>{athlete.sport}</span>
+                  <strong>{getAthleteFullName(athlete)}</strong>
+                  <span>{athlete.sport} · DNI {athlete.dni}</span>
                 </div>
                 <span className={`status status-${athlete.status.toLowerCase()}`}>
                   {athlete.status}
@@ -493,23 +677,59 @@ function App({ googleClientIdConfigured }: AppProps) {
       <section className="data-entry-panel" id="carga-datos" aria-labelledby="data-entry-title">
         <div className="section-heading">
           <p className="eyebrow">Carga de datos</p>
-          <h2 id="data-entry-title">Registrar asistencia de deportistas</h2>
+          <h2 id="data-entry-title">Registrar ficha de jugadores</h2>
           <p>
-            Carga un deportista, asignale deporte y marca su asistencia para que el
-            tablero se actualice al instante.
+            Carga apellido, nombre, DNI y datos de socio por separado para exportarlos a Excel
+            con columnas independientes.
           </p>
         </div>
 
-        <form className="data-form" onSubmit={handleAthleteSubmit}>
+        <form className="data-form data-form-expanded" onSubmit={handleAthleteSubmit}>
           <label>
-            Nombre del deportista
+            Nro. socio
             <input
               type="text"
-              value={newAthlete.name}
+              value={newAthlete.memberNumber}
               onChange={(event) =>
-                setNewAthlete((current) => ({ ...current, name: event.target.value }))
+                setNewAthlete((current) => ({ ...current, memberNumber: event.target.value }))
               }
-              placeholder="Ej: Valentina Perez"
+              placeholder="Ej: 4613"
+            />
+          </label>
+
+          <label>
+            Apellido
+            <input
+              type="text"
+              value={newAthlete.lastName}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, lastName: event.target.value }))
+              }
+              placeholder="Ej: Mendivil"
+            />
+          </label>
+
+          <label>
+            Nombre
+            <input
+              type="text"
+              value={newAthlete.firstName}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, firstName: event.target.value }))
+              }
+              placeholder="Ej: Benicio"
+            />
+          </label>
+
+          <label>
+            DNI
+            <input
+              type="text"
+              value={newAthlete.dni}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, dni: event.target.value }))
+              }
+              placeholder="Ej: 60.910.046"
             />
           </label>
 
@@ -530,6 +750,22 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
+            Activo
+            <select
+              value={newAthlete.memberStatus}
+              onChange={(event) =>
+                setNewAthlete((current) => ({
+                  ...current,
+                  memberStatus: event.target.value as Athlete['memberStatus'],
+                }))
+              }
+            >
+              <option value="Activo">Activo</option>
+              <option value="Inactivo">Inactivo</option>
+            </select>
+          </label>
+
+          <label>
             Asistencia
             <select
               value={newAthlete.status}
@@ -546,8 +782,107 @@ function App({ googleClientIdConfigured }: AppProps) {
             </select>
           </label>
 
+          <label>
+            Domicilio
+            <input
+              type="text"
+              value={newAthlete.address}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, address: event.target.value }))
+              }
+              placeholder="Ej: Avenida Paraguay 526"
+            />
+          </label>
+
+          <label>
+            Fecha nacimiento
+            <input
+              type="text"
+              value={newAthlete.birthDate}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, birthDate: event.target.value }))
+              }
+              placeholder="Ej: 27/02/2018"
+            />
+          </label>
+
+          <label>
+            Edad
+            <input
+              type="text"
+              value={newAthlete.age}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, age: event.target.value }))
+              }
+              placeholder="Ej: 8"
+            />
+          </label>
+
+          <label>
+            Teléfono / celular
+            <input
+              type="text"
+              value={newAthlete.phone}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, phone: event.target.value }))
+              }
+              placeholder="Ej: 3874098343"
+            />
+          </label>
+
+          <label>
+            Email
+            <input
+              type="email"
+              value={newAthlete.email}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, email: event.target.value }))
+              }
+              placeholder="Ej: jugador@email.com"
+            />
+          </label>
+
+          <label>
+            Forma de pago
+            <input
+              type="text"
+              value={newAthlete.paymentMethod}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, paymentMethod: event.target.value }))
+              }
+              placeholder="Ej: Mercado Pago"
+            />
+          </label>
+
+          <label>
+            Tipo socio
+            <input
+              type="text"
+              value={newAthlete.membershipType}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, membershipType: event.target.value }))
+              }
+              placeholder="Ej: Menor familia"
+            />
+          </label>
+
+          <label>
+            Próximo cobro
+            <input
+              type="text"
+              value={newAthlete.nextBillingDate}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, nextBillingDate: event.target.value }))
+              }
+              placeholder="Ej: 30/04/2026"
+            />
+          </label>
+
           <button className="primary-button form-button" type="submit">
             Guardar registro
+          </button>
+          <button className="export-button" type="button" onClick={exportAthletesToExcel}>
+            Exportar Excel
           </button>
         </form>
 
@@ -555,13 +890,17 @@ function App({ googleClientIdConfigured }: AppProps) {
 
         <div className="data-table" aria-label="Registros cargados">
           <div className="data-table-header">
-            <span>Deportista</span>
+            <span>Nro. socio</span>
+            <span>Jugador</span>
+            <span>DNI</span>
             <span>Deporte</span>
             <span>Asistencia</span>
           </div>
           {athleteList.map((athlete) => (
             <article className="data-table-row" key={athlete.id}>
-              <strong>{athlete.name}</strong>
+              <span>{athlete.memberNumber || '-'}</span>
+              <strong>{getAthleteFullName(athlete)}</strong>
+              <span>{athlete.dni}</span>
               <span>{athlete.sport}</span>
               <span className={`status status-${athlete.status.toLowerCase()}`}>
                 {athlete.status}
@@ -622,7 +961,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
-            {reportScope === 'Individual' ? 'Deportista' : reportScope}
+            {reportScope === 'Individual' ? 'Jugador' : reportScope}
             <select value={reportTarget} onChange={(event) => setReportTarget(event.target.value)}>
               {reportTargetOptions.map((target) => (
                 <option value={target} key={target}>
