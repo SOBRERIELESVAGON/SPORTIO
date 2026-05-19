@@ -1,5 +1,21 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+import {
+  createTranslator,
+  getAllSportsLabel,
+  isLanguageCode,
+  languageKey,
+  languageOptions,
+  translateActivity,
+  translateAttendanceStatus,
+  translateMemberStatus,
+  translateRankingScope,
+  translateReportPeriod,
+  translateReportScope,
+  translateRole,
+  type LanguageCode,
+  type Translator,
+} from './i18n';
 import {
   downloadPlayerImportTemplate,
   parseSpreadsheetFile,
@@ -11,18 +27,6 @@ type AttendanceStatus = 'Presente' | 'Ausente';
 type AttendanceActivity = 'Entrenamiento' | 'Partido';
 type UserRole = 'Jugador' | 'Staff' | 'Coordinación' | 'Master';
 type ProtectedRole = Exclude<UserRole, 'Jugador'>;
-type LanguageCode =
-  | 'es'
-  | 'en'
-  | 'pt'
-  | 'fr'
-  | 'it'
-  | 'de'
-  | 'nl'
-  | 'ca'
-  | 'gl'
-  | 'eu'
-  | 'zh';
 type ReportPeriod =
   | 'Diario'
   | 'Semanal'
@@ -118,23 +122,10 @@ const sportOptions = [
   'Golf',
 ];
 
-const allSportsReportOption = 'Todos los deportes';
+const ALL_SPORTS_VALUE = '__all_sports__';
 const rememberedRoleKey = 'sportia.rememberedRole';
 const rememberedPasswordKey = 'sportia.rememberedPassword';
 const preferredSportKey = 'sportia.preferredSport';
-const languageOptions: { code: LanguageCode; label: string }[] = [
-  { code: 'es', label: 'Español' },
-  { code: 'en', label: 'English' },
-  { code: 'pt', label: 'Português' },
-  { code: 'fr', label: 'Français' },
-  { code: 'it', label: 'Italiano' },
-  { code: 'de', label: 'Deutsch' },
-  { code: 'nl', label: 'Nederlands' },
-  { code: 'ca', label: 'Català' },
-  { code: 'gl', label: 'Galego' },
-  { code: 'eu', label: 'Euskera' },
-  { code: 'zh', label: '中文' },
-];
 const protectedRoles: ProtectedRole[] = ['Staff', 'Coordinación', 'Master'];
 const rolePasswords: Record<ProtectedRole, string> = {
   Staff: 'staff2026',
@@ -234,7 +225,7 @@ function clampAttendance(value: number) {
 function buildSportReportSeries(period: ReportPeriod, sport: string) {
   const baseSeries = reportSeriesByPeriod[period];
 
-  if (sport === allSportsReportOption) {
+  if (sport === ALL_SPORTS_VALUE) {
     return baseSeries;
   }
 
@@ -374,13 +365,15 @@ function removeStoredValue(key: string) {
 function LanguageSelector({
   selectedLanguage,
   onLanguageChange,
+  t,
 }: {
   selectedLanguage: LanguageCode;
   onLanguageChange: (language: LanguageCode) => void;
+  t: Translator;
 }) {
   return (
     <label className="language-selector">
-      Idioma
+      {t('common.language')}
       <select
         value={selectedLanguage}
         onChange={(event) => onLanguageChange(event.target.value as LanguageCode)}
@@ -398,13 +391,15 @@ function LanguageSelector({
 function SportPreferenceSelector({
   selectedSport,
   onSportChange,
+  t,
 }: {
   selectedSport: string;
   onSportChange: (sport: string) => void;
+  t: Translator;
 }) {
   return (
     <label className="sport-preference-selector">
-      Deporte fijo
+      {t('common.fixedSport')}
       <select value={selectedSport} onChange={(event) => onSportChange(event.target.value)}>
         {sportOptions.map((sport) => (
           <option value={sport} key={sport}>
@@ -416,13 +411,23 @@ function SportPreferenceSelector({
   );
 }
 
-function AdSlot({ title, placement, size }: { title: string; placement: string; size: string }) {
+function AdSlot({
+  title,
+  placement,
+  size,
+  t,
+}: {
+  title: string;
+  placement: string;
+  size: string;
+  t: Translator;
+}) {
   return (
     <aside className="ad-slot" aria-label={title}>
-      <span>Espacio publicitario</span>
+      <span>{t('ad.space')}</span>
       <strong>{title}</strong>
       <p>{placement}</p>
-      <small>{size} · Administrado por el dueño de Sportia</small>
+      <small>{t('ad.administered', { size })}</small>
     </aside>
   );
 }
@@ -614,6 +619,7 @@ function LoginScreen({
   onPreferredSportChange,
   preferredSport,
   selectedLanguage,
+  t,
 }: {
   error: string | null;
   athletes: Athlete[];
@@ -625,6 +631,7 @@ function LoginScreen({
   onPreferredSportChange: (sport: string) => void;
   preferredSport: string;
   selectedLanguage: LanguageCode;
+  t: Translator;
 }) {
   const [staffRole, setStaffRole] = useState<ProtectedRole>(() => {
     const savedRole = readStoredValue(rememberedRoleKey);
@@ -658,16 +665,13 @@ function LoginScreen({
   return (
     <main className="login-layout">
       <section className="login-hero">
-        <a className="brand" href="#inicio" aria-label="Sportia inicio">
+        <a className="brand" href="#inicio" aria-label={t('common.brandHome')}>
           <span className="brand-mark">S</span>
           <span>Sportia</span>
         </a>
-        <p className="eyebrow">Acceso por rol</p>
-        <h1>Usuarios gratis, publicidad gestionada por vos.</h1>
-        <p>
-          Clubes, entrenadores, staff, jugadores y coordinación usan Sportia gratis. El ingreso
-          Master permite ver todo y administrar el modelo con espacios publicitarios.
-        </p>
+        <p className="eyebrow">{t('login.roleAccess')}</p>
+        <h1>{t('login.heroTitle')}</h1>
+        <p>{t('login.heroDesc')}</p>
       </section>
 
       <section className="login-card" aria-labelledby="login-title">
@@ -675,49 +679,54 @@ function LoginScreen({
           <LanguageSelector
             selectedLanguage={selectedLanguage}
             onLanguageChange={onLanguageChange}
+            t={t}
           />
           <SportPreferenceSelector
             selectedSport={preferredSport}
             onSportChange={onPreferredSportChange}
+            t={t}
           />
         </div>
 
         <div>
           <p className="eyebrow">Login</p>
-          <h2 id="login-title">Elegí cómo entrar</h2>
+          <h2 id="login-title">{t('login.title')}</h2>
           <p>
-            Las claves de demo son <strong>staff2026</strong> para Staff y{' '}
-            <strong>coord2026</strong> para Coordinación. Master usa <strong>master2026</strong>.
+            {t('login.demoKeys', {
+              staffKey: 'staff2026',
+              coordKey: 'coord2026',
+              masterKey: 'master2026',
+            })}
           </p>
         </div>
 
         <form className="access-form" onSubmit={handleStaffSubmit}>
           <label>
-            Rol con clave
+            {t('login.roleWithPassword')}
             <select
               value={staffRole}
               onChange={(event) => setStaffRole(event.target.value as ProtectedRole)}
             >
               {protectedRoles.map((role) => (
                 <option value={role} key={role}>
-                  {role}
+                  {translateRole(selectedLanguage, role)}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            Clave
+            {t('login.password')}
             <div className="password-field">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={staffPassword}
                 onChange={(event) => setStaffPassword(event.target.value)}
-                placeholder="Ingresá la clave"
+                placeholder={t('login.passwordPlaceholder')}
               />
               <button
                 type="button"
-                aria-label={showPassword ? 'Ocultar clave' : 'Ver clave'}
+                aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
                 onClick={() => setShowPassword((currentValue) => !currentValue)}
               >
                 {showPassword ? '🙈' : '👁️'}
@@ -731,11 +740,11 @@ function LoginScreen({
               checked={rememberPassword}
               onChange={(event) => setRememberPassword(event.target.checked)}
             />
-            Guardar permanentemente esta clave en este navegador
+            {t('login.rememberPassword')}
           </label>
 
           <button className="demo-button" type="submit">
-            Entrar como {staffRole}
+            {t('login.enterAs', { role: translateRole(selectedLanguage, staffRole) })}
           </button>
         </form>
 
@@ -753,28 +762,25 @@ function LoginScreen({
           </div>
         ) : (
           <div className="config-warning" role="status">
-            <strong>Google opcional no configurado.</strong>
-            <span>
-              Crea un archivo <code>.env</code> con <code>VITE_GOOGLE_CLIENT_ID</code>.
-              Las claves de Staff/Coordinación funcionan igual para esta demo.
-            </span>
+            <strong>{t('login.googleNotConfigured')}</strong>
+            <span>{t('login.googleNotConfiguredHint')}</span>
           </div>
         )}
 
         {googleIdentity ? (
-          <p className="save-message">Google validó {googleIdentity}. Ingresá la clave del rol.</p>
+          <p className="save-message">{t('login.googleValidated', { email: googleIdentity })}</p>
         ) : null}
 
         {error ? <p className="auth-error">{error}</p> : null}
 
         <div className="player-access-card">
           <div>
-            <p className="eyebrow">Jugador</p>
-            <h3>Entrar sin clave</h3>
-            <p>El jugador solo podrá ver su ficha individual y el ranking.</p>
+            <p className="eyebrow">{t('login.player')}</p>
+            <h3>{t('login.playerNoPassword')}</h3>
+            <p>{t('login.playerDesc')}</p>
           </div>
           <label>
-            Jugador
+            {t('login.playerLabel')}
             <select
               value={selectedAthleteId}
               onChange={(event) => setSelectedAthleteId(Number(event.target.value))}
@@ -791,7 +797,7 @@ function LoginScreen({
             type="button"
             onClick={() => onPlayerAccess(selectedAthleteId)}
           >
-            Entrar como jugador
+            {t('login.enterAsPlayer')}
           </button>
         </div>
       </section>
@@ -801,7 +807,22 @@ function LoginScreen({
 
 function App({ googleClientIdConfigured }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('es');
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(() => {
+    const storedLanguage = readStoredValue(languageKey);
+
+    return isLanguageCode(storedLanguage) ? storedLanguage : 'es';
+  });
+  const t = useMemo(() => createTranslator(selectedLanguage), [selectedLanguage]);
+
+  useEffect(() => {
+    document.documentElement.lang = selectedLanguage;
+  }, [selectedLanguage]);
+
+  const handleLanguageChange = (language: LanguageCode) => {
+    setSelectedLanguage(language);
+    writeStoredValue(languageKey, language);
+  };
+
   const [preferredSport, setPreferredSport] = useState(() => {
     const storedSport = readStoredValue(preferredSportKey);
 
@@ -874,19 +895,19 @@ function App({ googleClientIdConfigured }: AppProps) {
     item.attendance > best.attendance ? item : best,
   );
   const athletesForReportSport =
-    reportSport === allSportsReportOption
+    reportSport === ALL_SPORTS_VALUE
       ? athleteList
       : athleteList.filter((athlete) => athlete.sport === reportSport);
   const individualReportTargets =
     athletesForReportSport.length > 0
       ? athletesForReportSport.map((athlete) => getAthleteFullName(athlete))
-      : ['Sin deportistas cargados'];
+      : [t('report.noAthletes')];
   const reportTargetOptions =
     reportScope === 'Individual' ? individualReportTargets : reportGroupsByScope[reportScope];
   const [rankingSport, setRankingSport] = useState(preferredSport);
   const [rankingScope, setRankingScope] = useState<(typeof rankingScopes)[number]>('Camada');
   const rankingCandidates =
-    rankingSport === allSportsReportOption
+    rankingSport === ALL_SPORTS_VALUE
       ? athleteList
       : athleteList.filter((athlete) => athlete.sport === rankingSport);
   const rankingGroupOptions = Array.from(
@@ -931,9 +952,9 @@ function App({ googleClientIdConfigured }: AppProps) {
     }))
     .sort((left, right) => right.score - left.score);
   const metrics = [
-    { label: 'Deportistas cargados', value: String(athleteList.length) },
-    { label: 'Asistencia de hoy', value: `${attendancePercentage}%` },
-    { label: 'Medallas 30 días', value: String(perfectAttendanceCount) },
+    { label: t('metrics.loadedAthletes'), value: String(athleteList.length) },
+    { label: t('metrics.todayAttendance'), value: `${attendancePercentage}%` },
+    { label: t('metrics.medals30'), value: String(perfectAttendanceCount) },
   ];
   const activePlayersCount = athleteList.filter((athlete) => athlete.memberStatus === 'Activo').length;
   const totalTeamsCount = new Set(athleteList.map((athlete) => athlete.team).filter(Boolean)).size;
@@ -943,19 +964,19 @@ function App({ googleClientIdConfigured }: AppProps) {
       athleteList.length,
   );
   const masterStats = [
-    { label: 'Jugadores totales', value: String(athleteList.length) },
-    { label: 'Jugadores activos', value: String(activePlayersCount) },
-    { label: 'Equipos registrados', value: String(totalTeamsCount) },
-    { label: 'Camadas registradas', value: String(totalCohortsCount) },
-    { label: 'Staff demo', value: '2' },
-    { label: 'Coordinación demo', value: '1' },
-    { label: 'Clubes demo', value: '1' },
-    { label: 'Promedio ranking', value: `${averageRankingScore} pts` },
+    { label: t('master.stat.totalPlayers'), value: String(athleteList.length) },
+    { label: t('master.stat.activePlayers'), value: String(activePlayersCount) },
+    { label: t('master.stat.teams'), value: String(totalTeamsCount) },
+    { label: t('master.stat.cohorts'), value: String(totalCohortsCount) },
+    { label: t('master.stat.staffDemo'), value: '2' },
+    { label: t('master.stat.coordDemo'), value: '1' },
+    { label: t('master.stat.clubsDemo'), value: '1' },
+    { label: t('master.stat.avgRanking'), value: `${averageRankingScore} ${t('common.pts')}` },
   ];
 
   const handleStaffAccess = (role: ProtectedRole, password: string, rememberPassword: boolean) => {
     if (rolePasswords[role] !== password) {
-      setAuthError('Clave incorrecta para el rol seleccionado.');
+      setAuthError(t('auth.wrongPassword'));
       return;
     }
 
@@ -988,7 +1009,7 @@ function App({ googleClientIdConfigured }: AppProps) {
     const athlete = athleteList.find((currentAthlete) => currentAthlete.id === athleteId);
 
     if (!athlete) {
-      setAuthError('No encontramos la ficha del jugador seleccionado.');
+      setAuthError(t('auth.playerNotFound'));
       return;
     }
 
@@ -1010,7 +1031,7 @@ function App({ googleClientIdConfigured }: AppProps) {
     const trimmedSport = newAthlete.sport.trim();
 
     if (!trimmedFirstName || !trimmedLastName || !trimmedDni || !trimmedSport) {
-      setSaveMessage('Completa apellido, nombre, DNI y deporte para cargar el registro.');
+      setSaveMessage(t('message.saveRequired'));
       return;
     }
 
@@ -1082,7 +1103,10 @@ function App({ googleClientIdConfigured }: AppProps) {
       status: 'Presente',
     });
     setSaveMessage(
-      `${trimmedLastName.toUpperCase()} ${trimmedFirstName.toUpperCase()} fue cargado correctamente.`,
+      t('message.saveSuccess', {
+        lastName: trimmedLastName.toUpperCase(),
+        firstName: trimmedFirstName.toUpperCase(),
+      }),
     );
   };
 
@@ -1126,23 +1150,18 @@ function App({ googleClientIdConfigured }: AppProps) {
       );
 
       if (players.length === 0) {
-        setImportMessage(
-          'No se encontraron filas válidas. Descargá la plantilla y completá apellido, nombre y DNI.',
-        );
+        setImportMessage(t('import.noValidRows'));
         return;
       }
 
       addImportedPlayers(players);
       setImportMessage(
-        `Se importaron ${players.length} jugador(es).${
-          skipped > 0 ? ` ${skipped} fila(s) se omitieron por datos incompletos.` : ''
-        }`,
+        t('import.success', { count: players.length }) +
+          (skipped > 0 ? t('import.skipped', { count: skipped }) : ''),
       );
       setSaveMessage(null);
     } catch {
-      setImportMessage(
-        'No se pudo leer la planilla. Verificá que sea Excel (.xlsx, .xls) o CSV compatible.',
-      );
+      setImportMessage(t('import.fileError'));
     } finally {
       setImportLoading(false);
       event.target.value = '';
@@ -1167,7 +1186,7 @@ function App({ googleClientIdConfigured }: AppProps) {
 
   const handlePhotoImport = async () => {
     if (!photoFile) {
-      setImportMessage('Seleccioná una foto de la ficha antes de extraer los datos.');
+      setImportMessage(t('import.selectPhoto'));
       return;
     }
 
@@ -1191,22 +1210,20 @@ function App({ googleClientIdConfigured }: AppProps) {
           ...current,
           ...importDataToFormState(extracted, preferredSport),
         }));
-        setImportMessage(
-          'Extracción parcial desde la foto: revisá y completá los campos antes de guardar.',
-        );
+        setImportMessage(t('import.partial'));
         return;
       }
 
       addImportedPlayers([extracted]);
       setImportMessage(
-        `Jugador ${extracted.lastName.toUpperCase()} ${extracted.firstName.toUpperCase()} importado desde la foto.`,
+        t('import.fromPhoto', {
+          name: `${extracted.lastName.toUpperCase()} ${extracted.firstName.toUpperCase()}`,
+        }),
       );
       clearPhotoSelection();
       setSaveMessage(null);
     } catch {
-      setImportMessage(
-        'No se pudo leer la foto. Usá buena luz, encuadre la ficha completa e intentá de nuevo.',
-      );
+      setImportMessage(t('import.photoError'));
     } finally {
       setImportLoading(false);
       setImportProgress(0);
@@ -1382,7 +1399,7 @@ function App({ googleClientIdConfigured }: AppProps) {
 
   const handleReportSportChange = (sport: string) => {
     const athletesInSelectedSport =
-      sport === allSportsReportOption
+      sport === ALL_SPORTS_VALUE
         ? athleteList
         : athleteList.filter((athlete) => athlete.sport === sport);
 
@@ -1392,7 +1409,7 @@ function App({ googleClientIdConfigured }: AppProps) {
       setReportTarget(
         athletesInSelectedSport[0]
           ? getAthleteFullName(athletesInSelectedSport[0])
-          : 'Sin deportistas cargados',
+          : t('report.noAthletes'),
       );
     }
   };
@@ -1403,8 +1420,9 @@ function App({ googleClientIdConfigured }: AppProps) {
         error={authError}
         athletes={athleteList}
         googleClientIdConfigured={googleClientIdConfigured}
-        onGoogleError={() => setAuthError('Google no pudo iniciar sesion. Intentalo otra vez.')}
-        onLanguageChange={setSelectedLanguage}
+        onGoogleError={() => setAuthError(t('auth.googleError'))}
+        onLanguageChange={handleLanguageChange}
+        t={t}
         onPreferredSportChange={handlePreferredSportChange}
         onPlayerAccess={handlePlayerAccess}
         onStaffAccess={handleStaffAccess}
@@ -1416,28 +1434,30 @@ function App({ googleClientIdConfigured }: AppProps) {
 
   return (
     <main className="app-shell">
-      <nav className="topbar" aria-label="Principal">
-        <a className="brand" href="#inicio" aria-label="Sportia inicio">
+      <nav className="topbar" aria-label={t('nav.main')}>
+        <a className="brand" href="#inicio" aria-label={t('common.brandHome')}>
           <span className="brand-mark">S</span>
           <span>Sportia</span>
         </a>
         <div className="nav-links">
-          {isPrivilegedUser ? <a href="#control-asistencia">Asistencia</a> : null}
-          {isPrivilegedUser ? <a href="#carga-datos">Carga</a> : null}
-          {userRole === 'Jugador' ? <a href="#mi-ficha">Mi ficha</a> : null}
-          <a href="#ranking">Ranking</a>
-          {isMasterUser ? <a href="#master-panel">Master</a> : null}
-          {isPrivilegedUser ? <a href="#reportes">Reportes</a> : null}
-          {isPrivilegedUser ? <a href="#equipos">Equipos</a> : null}
+          {isPrivilegedUser ? <a href="#control-asistencia">{t('nav.attendance')}</a> : null}
+          {isPrivilegedUser ? <a href="#carga-datos">{t('nav.dataEntry')}</a> : null}
+          {userRole === 'Jugador' ? <a href="#mi-ficha">{t('nav.myProfile')}</a> : null}
+          <a href="#ranking">{t('nav.ranking')}</a>
+          {isMasterUser ? <a href="#master-panel">{t('nav.master')}</a> : null}
+          {isPrivilegedUser ? <a href="#reportes">{t('nav.reports')}</a> : null}
+          {isPrivilegedUser ? <a href="#equipos">{t('nav.teams')}</a> : null}
         </div>
         <div className="user-menu">
           <LanguageSelector
             selectedLanguage={selectedLanguage}
-            onLanguageChange={setSelectedLanguage}
+            onLanguageChange={handleLanguageChange}
+            t={t}
           />
           <SportPreferenceSelector
             selectedSport={preferredSport}
             onSportChange={handlePreferredSportChange}
+            t={t}
           />
           {user.picture ? (
             <img className="user-avatar" src={user.picture} alt="" referrerPolicy="no-referrer" />
@@ -1446,7 +1466,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           )}
           <div>
             <strong>{user.name}</strong>
-            <span>{userRole}</span>
+            <span>{translateRole(selectedLanguage, userRole)}</span>
           </div>
           <button
             className="sign-out-button"
@@ -1457,43 +1477,42 @@ function App({ googleClientIdConfigured }: AppProps) {
               setSelectedPlayerId(null);
             }}
           >
-            Salir
+            {t('common.signOut')}
           </button>
         </div>
       </nav>
 
       <section className="hero" id="inicio">
         <div className="hero-copy">
-          <p className="eyebrow">Gestion deportiva multi-deporte</p>
-          <h1>Controla asistencia, equipos y entrenamientos sin cobrarle a los usuarios.</h1>
+          <p className="eyebrow">{t('hero.eyebrow')}</p>
+          <h1>{t('hero.title')}</h1>
           <p className="hero-description">
-            Sportia es gratis para clubes, entrenadores, staff, jugadores y coordinación. La
-            monetización queda en espacios de publicidad administrados por vos.
+            {t('hero.description')}
           </p>
           <div className="hero-actions">
             <a className="primary-button" href="#ranking">
-              Ver ranking
+              {t('hero.viewRanking')}
             </a>
             {isPrivilegedUser ? (
               <a className="secondary-button" href="#carga-datos">
-                Cargar datos
+                {t('hero.loadData')}
               </a>
             ) : null}
             {isPrivilegedUser ? (
               <a className="secondary-button" href="#reportes">
-                Ver reportes
+                {t('hero.viewReports')}
               </a>
             ) : null}
           </div>
         </div>
 
         {isPrivilegedUser ? (
-          <aside className="attendance-card" id="asistencia" aria-label="Resumen de asistencia de hoy">
+          <aside className="attendance-card" id="asistencia" aria-label={t('hero.attendanceSummary')}>
             <div className="card-header">
-              <span>Entrenamiento de hoy</span>
+              <span>{t('hero.trainingToday')}</span>
               <strong>{presentCount}/{athleteList.length}</strong>
             </div>
-            <h2>Lista rapida</h2>
+            <h2>{t('hero.quickList')}</h2>
             <div className="athlete-list">
               {athleteList.slice(0, 5).map((athlete) => (
                 <article className="athlete-row" key={athlete.id}>
@@ -1502,7 +1521,7 @@ function App({ googleClientIdConfigured }: AppProps) {
                     <span>{athlete.sport} · DNI {athlete.dni}</span>
                   </div>
                   <span className={`status status-${athlete.status.toLowerCase()}`}>
-                    {athlete.status}
+                    {translateAttendanceStatus(selectedLanguage, athlete.status)}
                   </span>
                 </article>
               ))}
@@ -1510,34 +1529,34 @@ function App({ googleClientIdConfigured }: AppProps) {
           </aside>
         ) : (
           <aside className="attendance-card public-access-card">
-            <p className="eyebrow">Vista jugador</p>
-            <h2>Ficha individual y ranking.</h2>
+            <p className="eyebrow">{t('hero.playerView')}</p>
+            <h2>{t('hero.playerCardTitle')}</h2>
             <p>
-              Entraste como jugador. Solo tenés acceso a tu ficha individual y al ranking público.
+              {t('hero.playerCardDesc')}
             </p>
             <a className="primary-button" href="#mi-ficha">
-              Ver mi ficha
+              {t('hero.viewMyProfile')}
             </a>
             <a className="primary-button" href="#ranking">
-              Ir al ranking
+              {t('hero.goToRanking')}
             </a>
           </aside>
         )}
       </section>
 
-      <section className="free-access-banner" aria-label="Modelo gratis con publicidad">
+      <section className="free-access-banner" aria-label={t('banner.aria')}>
         <div>
-          <p className="eyebrow">Modelo gratuito</p>
-          <h2>Clubes, entrenadores, staff, jugadores y coordinación no pagan.</h2>
-          <p>Los ingresos se generan con espacios publicitarios propios dentro de Sportia.</p>
+          <p className="eyebrow">{t('banner.eyebrow')}</p>
+          <h2>{t('banner.title')}</h2>
+          <p>{t('banner.desc')}</p>
         </div>
-        <span>Publicidad administrada por el dueño</span>
+        <span>{t('banner.owner')}</span>
       </section>
 
-      <AdSlot {...adSlots[0]} />
+      <AdSlot title={t('ad.hero.title')} placement={t('ad.hero.placement')} size={adSlots[0].size} t={t} />
 
       {isPrivilegedUser ? (
-        <section className="metrics-grid" aria-label="Metricas principales">
+        <section className="metrics-grid" aria-label={t('metrics.aria')}>
           {metrics.map((metric) => (
             <article className="metric-card" key={metric.label}>
               <span>{metric.label}</span>
@@ -1550,11 +1569,10 @@ function App({ googleClientIdConfigured }: AppProps) {
       {isMasterUser ? (
         <section className="master-panel" id="master-panel" aria-labelledby="master-panel-title">
           <div className="section-heading">
-            <p className="eyebrow">Master</p>
-            <h2 id="master-panel-title">Panel de control global</h2>
+            <p className="eyebrow">{t('master.eyebrow')}</p>
+            <h2 id="master-panel-title">{t('master.title')}</h2>
             <p>
-              El rol Master ve todo lo que hacen Staff, Coordinación y jugadores. Este panel reúne
-              estadísticas, reportes de usuarios y espacios de publicidad.
+              {t('master.desc')}
             </p>
           </div>
 
@@ -1570,42 +1588,42 @@ function App({ googleClientIdConfigured }: AppProps) {
           <div className="master-grid">
             <article className="master-card">
               <div className="section-heading compact">
-                <p className="eyebrow">Usuarios</p>
-                <h3>Reporte por tipo</h3>
+                <p className="eyebrow">{t('master.users')}</p>
+                <h3>{t('master.usersByType')}</h3>
               </div>
               <div className="user-report-list">
                 <div>
-                  <span>Clubes</span>
+                  <span>{t('master.clubs')}</span>
                   <strong>1</strong>
-                  <small>Gratis</small>
+                  <small>{t('common.free')}</small>
                 </div>
                 <div>
-                  <span>Entrenadores</span>
+                  <span>{t('master.coaches')}</span>
                   <strong>2</strong>
-                  <small>Gratis</small>
+                  <small>{t('common.free')}</small>
                 </div>
                 <div>
-                  <span>Staff</span>
+                  <span>{t('role.staff')}</span>
                   <strong>2</strong>
-                  <small>Gratis</small>
+                  <small>{t('common.free')}</small>
                 </div>
                 <div>
-                  <span>Coordinación</span>
+                  <span>{t('role.coordination')}</span>
                   <strong>1</strong>
-                  <small>Gratis</small>
+                  <small>{t('common.free')}</small>
                 </div>
                 <div>
-                  <span>Jugadores</span>
+                  <span>{t('master.players')}</span>
                   <strong>{athleteList.length}</strong>
-                  <small>Gratis</small>
+                  <small>{t('common.free')}</small>
                 </div>
               </div>
             </article>
 
             <article className="master-card">
               <div className="section-heading compact">
-                <p className="eyebrow">Publicidad</p>
-                <h3>Inventario disponible</h3>
+                <p className="eyebrow">{t('master.ads')}</p>
+                <h3>{t('master.adInventory')}</h3>
               </div>
               <div className="ad-management-list">
                 {adSlots.map((slot) => (
@@ -1620,17 +1638,17 @@ function App({ googleClientIdConfigured }: AppProps) {
           </div>
 
           <div className="master-grid">
-            <AdSlot {...adSlots[1]} />
+            <AdSlot title={t('ad.sidebar.title')} placement={t('ad.sidebar.placement')} size={adSlots[1].size} t={t} />
             <article className="master-card">
               <div className="section-heading compact">
-                <p className="eyebrow">Actividad</p>
-                <h3>Últimos movimientos demo</h3>
+                <p className="eyebrow">{t('master.activity')}</p>
+                <h3>{t('master.recentDemo')}</h3>
               </div>
               <div className="activity-list">
-                <span>Staff actualizó asistencia operativa.</span>
-                <span>Coordinación revisó reportes por deporte.</span>
-                <span>Jugador consultó ficha individual.</span>
-                <span>Master visualizó estadísticas globales.</span>
+                <span>{t('master.activity.staff')}</span>
+                <span>{t('master.activity.coord')}</span>
+                <span>{t('master.activity.player')}</span>
+                <span>{t('master.activity.master')}</span>
               </div>
             </article>
           </div>
@@ -1640,51 +1658,53 @@ function App({ googleClientIdConfigured }: AppProps) {
       {userRole === 'Jugador' && selectedPlayer ? (
         <section className="player-profile-panel" id="mi-ficha" aria-labelledby="player-profile-title">
           <div className="section-heading">
-            <p className="eyebrow">Mi ficha</p>
+            <p className="eyebrow">{t('profile.eyebrow')}</p>
             <h2 id="player-profile-title">{getAthleteFullName(selectedPlayer)}</h2>
-            <p>Esta vista es individual: el jugador solo ve su propia ficha y el ranking público.</p>
+            <p>{t('profile.desc')}</p>
           </div>
 
           <div className="player-profile-grid">
             <article>
-              <span>Nro. socio</span>
+              <span>{t('profile.memberNumber')}</span>
               <strong>{selectedPlayer.memberNumber || '-'}</strong>
             </article>
             <article>
-              <span>DNI</span>
+              <span>{t('profile.dni')}</span>
               <strong>{selectedPlayer.dni}</strong>
             </article>
             <article>
-              <span>Deporte</span>
+              <span>{t('profile.sport')}</span>
               <strong>{selectedPlayer.sport}</strong>
             </article>
             <article>
-              <span>Equipo</span>
+              <span>{t('profile.team')}</span>
               <strong>{selectedPlayer.team || '-'}</strong>
             </article>
             <article>
-              <span>Camada</span>
+              <span>{t('profile.cohort')}</span>
               <strong>{selectedPlayer.cohort || '-'}</strong>
             </article>
             <article>
-              <span>Edad</span>
+              <span>{t('profile.age')}</span>
               <strong>{selectedPlayer.age || '-'}</strong>
             </article>
             <article>
-              <span>Asistencia</span>
-              <strong>{selectedPlayer.status}</strong>
+              <span>{t('profile.attendance')}</span>
+              <strong>{translateAttendanceStatus(selectedLanguage, selectedPlayer.status)}</strong>
             </article>
             <article>
-              <span>Ranking</span>
-              <strong>{calculateRankingScore(selectedPlayer)} pts</strong>
+              <span>{t('profile.ranking')}</span>
+              <strong>
+                {calculateRankingScore(selectedPlayer)} {t('common.pts')}
+              </strong>
             </article>
           </div>
 
           <div className="player-profile-note">
             {selectedPlayer.perfectAttendance30Days ? (
-              <span className="medal-badge">🏅 Medalla por asistencia perfecta 30 días</span>
+              <span className="medal-badge">🏅 {t('profile.medal30')}</span>
             ) : (
-              <span className="muted-badge">Sin medalla de 30 días</span>
+              <span className="muted-badge">{t('profile.noMedal30')}</span>
             )}
           </div>
         </section>
@@ -1692,29 +1712,27 @@ function App({ googleClientIdConfigured }: AppProps) {
 
       <section className="ranking-panel" id="ranking" aria-labelledby="ranking-title">
         <div className="section-heading">
-          <p className="eyebrow">Ranking público</p>
-          <h2 id="ranking-title">Ranking por asistencia y compromiso</h2>
+          <p className="eyebrow">{t('ranking.eyebrow')}</p>
+          <h2 id="ranking-title">{t('ranking.title')}</h2>
           <p>
-            Visible para todos los usuarios. Ordena jugadores que comparten camada, edad o equipo,
-            sumando 10 pts por entrenamientos, 10 pts por partidos, 10 pts por viaje/gira,
-            20 pts si se aloja y 20 pts si hospeda/recibe.
+            {t('ranking.desc')}
           </p>
         </div>
 
-        <div className="report-filters" aria-label="Filtros de ranking">
+        <div className="report-filters" aria-label={t('ranking.filters')}>
           <label>
-            Deporte
+            {t('form.sport')}
             <select value={rankingSport} onChange={(event) => setRankingSport(event.target.value)}>
-              {[allSportsReportOption, ...sportOptions].map((sport) => (
+              {[ALL_SPORTS_VALUE, ...sportOptions].map((sport) => (
                 <option value={sport} key={sport}>
-                  {sport}
+                  {sport === ALL_SPORTS_VALUE ? getAllSportsLabel(selectedLanguage) : sport}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            Comparar por
+            {t('ranking.compareBy')}
             <select
               value={rankingScope}
               onChange={(event) =>
@@ -1723,16 +1741,16 @@ function App({ googleClientIdConfigured }: AppProps) {
             >
               {rankingScopes.map((scope) => (
                 <option value={scope} key={scope}>
-                  {scope}
+                  {translateRankingScope(selectedLanguage, scope)}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            Grupo
+            {t('ranking.group')}
             <select value={normalizedRankingGroup} onChange={(event) => setRankingGroup(event.target.value)}>
-              <option value="Todos">Todos</option>
+              <option value="Todos">{t('common.all')}</option>
               {rankingGroupOptions.map((group) => (
                 <option value={group} key={group}>
                   {group}
@@ -1749,22 +1767,22 @@ function App({ googleClientIdConfigured }: AppProps) {
               <div>
                 <strong>{getAthleteFullName(athlete)}</strong>
                 <span>
-                  {athlete.team || athlete.sport} · {athlete.cohort || `${athlete.age} años`}
+                  {athlete.team || athlete.sport} · {athlete.cohort || `${athlete.age} ${t('common.years')}`}
                 </span>
               </div>
               {athlete.perfectAttendance30Days ? (
-                <span className="medal-badge">🏅 30 días</span>
+                <span className="medal-badge">🏅 {t('ranking.medal30')}</span>
               ) : (
-                <span className="muted-badge">Sin medalla</span>
+                <span className="muted-badge">{t('ranking.noMedal')}</span>
               )}
               <div className="ranking-breakdown">
-                <span>Entr. {athlete.trainingsAttended}/{athlete.trainingsTotal}</span>
-                <span>Part. {athlete.matchesAttended}/{athlete.matchesTotal}</span>
-                <span>Viaje {athlete.toursAttended}/{athlete.toursTotal}</span>
-                <span>{athlete.stayedAsGuest ? '+20 se aloja' : 'No se aloja'}</span>
-                <span>{athlete.hostedGuest ? '+20 hospeda/recibe' : 'No hospeda'}</span>
+                <span>{t('ranking.breakdown.train')} {athlete.trainingsAttended}/{athlete.trainingsTotal}</span>
+                <span>{t('ranking.breakdown.match')} {athlete.matchesAttended}/{athlete.matchesTotal}</span>
+                <span>{t('ranking.breakdown.tour')} {athlete.toursAttended}/{athlete.toursTotal}</span>
+                <span>{athlete.stayedAsGuest ? t('ranking.staysGuest') : t('ranking.noStaysGuest')}</span>
+                <span>{athlete.hostedGuest ? t('ranking.hosts') : t('ranking.noHosts')}</span>
               </div>
-              <strong className="ranking-score">{score} pts</strong>
+              <strong className="ranking-score">{score} {t('common.pts')}</strong>
             </article>
           ))}
         </div>
@@ -1774,29 +1792,28 @@ function App({ googleClientIdConfigured }: AppProps) {
         <>
       <section className="operations-panel" id="control-asistencia" aria-labelledby="attendance-control-title">
         <div className="section-heading">
-          <p className="eyebrow">Asistencia operativa</p>
-          <h2 id="attendance-control-title">Control de entrenamiento o partido</h2>
+          <p className="eyebrow">{t('ops.attendance.eyebrow')}</p>
+          <h2 id="attendance-control-title">{t('ops.attendance.title')}</h2>
           <p>
-            Todos los jugadores arrancan como presentes. El operador solo marca ausentes según
-            corresponda al entrenamiento o al partido seleccionado.
+            {t('ops.attendance.desc')}
           </p>
         </div>
 
         <div className="operation-toolbar">
           <label>
-            Tipo de actividad
+            {t('ops.attendance.activityType')}
             <select
               value={attendanceActivity}
               onChange={(event) =>
                 setAttendanceActivity(event.target.value as AttendanceActivity)
               }
             >
-              <option value="Entrenamiento">Entrenamiento</option>
-              <option value="Partido">Partido</option>
+              <option value="Entrenamiento">{translateActivity(selectedLanguage, 'Entrenamiento')}</option>
+              <option value="Partido">{translateActivity(selectedLanguage, 'Partido')}</option>
             </select>
           </label>
           <button className="export-button" type="button" onClick={markAllAttendancePresent}>
-            Todos presentes
+            {t('ops.attendance.allPresent')}
           </button>
         </div>
 
@@ -1806,23 +1823,23 @@ function App({ googleClientIdConfigured }: AppProps) {
               <div>
                 <strong>{getAthleteFullName(athlete)}</strong>
                 <span>
-                  {attendanceActivity} · {athlete.team || athlete.sport}
+                  {translateActivity(selectedLanguage, attendanceActivity)} · {athlete.team || athlete.sport}
                 </span>
               </div>
-              <div className="segmented-control" aria-label={`Asistencia de ${getAthleteFullName(athlete)}`}>
+              <div className="segmented-control" aria-label={t('ranking.attendanceOf', { name: getAthleteFullName(athlete) })}>
                 <button
                   className={athlete.status === 'Presente' ? 'active' : ''}
                   type="button"
                   onClick={() => updateActivityAttendance(athlete, 'Presente')}
                 >
-                  Presente
+                  {translateAttendanceStatus(selectedLanguage, 'Presente')}
                 </button>
                 <button
                   className={athlete.status === 'Ausente' ? 'danger active' : 'danger'}
                   type="button"
                   onClick={() => updateActivityAttendance(athlete, 'Ausente')}
                 >
-                  Ausente
+                  {translateAttendanceStatus(selectedLanguage, 'Ausente')}
                 </button>
               </div>
             </article>
@@ -1832,17 +1849,16 @@ function App({ googleClientIdConfigured }: AppProps) {
 
       <section className="operations-panel" id="control-giras" aria-labelledby="tour-control-title">
         <div className="section-heading">
-          <p className="eyebrow">Giras</p>
-          <h2 id="tour-control-title">Control de asistencia y hospedaje</h2>
+          <p className="eyebrow">{t('ops.tours.eyebrow')}</p>
+          <h2 id="tour-control-title">{t('ops.tours.title')}</h2>
           <p>
-            En giras todos arrancan como presentes. Marcá ausentes y luego indicá quién se aloja
-            y quién hospeda/recibe jugadores.
+            {t('ops.tours.desc')}
           </p>
         </div>
 
         <div className="operation-toolbar">
           <button className="export-button" type="button" onClick={markAllToursPresent}>
-            Todos presentes en gira
+            {t('ops.tours.allPresent')}
           </button>
         </div>
 
@@ -1856,7 +1872,7 @@ function App({ googleClientIdConfigured }: AppProps) {
                   <strong>{getAthleteFullName(athlete)}</strong>
                   <span>{athlete.cohort || athlete.team || athlete.sport}</span>
                 </div>
-                <div className="segmented-control" aria-label={`Gira de ${getAthleteFullName(athlete)}`}>
+                <div className="segmented-control" aria-label={t('ranking.tourOf', { name: getAthleteFullName(athlete) })}>
                   <button
                     className={isTourPresent ? 'active' : ''}
                     type="button"
@@ -1880,7 +1896,7 @@ function App({ googleClientIdConfigured }: AppProps) {
                       updateAthlete(athlete.id, { stayedAsGuest: event.target.checked })
                     }
                   />
-                  Se aloja
+                  {t('ops.staysGuest')}
                 </label>
                 <label className="inline-checkbox">
                   <input
@@ -1890,7 +1906,7 @@ function App({ googleClientIdConfigured }: AppProps) {
                       updateAthlete(athlete.id, { hostedGuest: event.target.checked })
                     }
                   />
-                  Hospeda / recibe
+                  {t('ops.hostsGuest')}
                 </label>
               </article>
             );
@@ -1900,35 +1916,33 @@ function App({ googleClientIdConfigured }: AppProps) {
 
       <section className="data-entry-panel" id="carga-datos" aria-labelledby="data-entry-title">
         <div className="section-heading">
-          <p className="eyebrow">Carga de datos</p>
-          <h2 id="data-entry-title">Registrar ficha de jugadores</h2>
+          <p className="eyebrow">{t('data.eyebrow')}</p>
+          <h2 id="data-entry-title">{t('data.title')}</h2>
           <p>
-            Carga apellido, nombre, DNI, obra social y datos de socio por separado, importá una
-            planilla Excel o extraé datos desde una foto de la ficha.
+            {t('data.desc')}
           </p>
         </div>
 
         {canImportPlayers ? (
           <div className="import-panel" aria-labelledby="import-panel-title">
             <div className="section-heading compact">
-              <h3 id="import-panel-title">Importar jugadores</h3>
+              <h3 id="import-panel-title">{t('import.title')}</h3>
               <p>
-                Disponible para staff y coordinación: subí una planilla (.xlsx, .xls o CSV) o una
-                foto de la ficha para completar los datos automáticamente.
+                {t('import.desc')}
               </p>
             </div>
 
             <div className="import-actions">
               <article className="import-card">
-                <strong>Planilla Excel</strong>
-                <p>Usá la misma estructura de columnas que la exportación de Sportia.</p>
+                <strong>{t('import.excelTitle')}</strong>
+                <p>{t('import.excelDesc')}</p>
                 <div className="import-buttons">
                   <button
                     className="secondary-button"
                     type="button"
                     onClick={downloadPlayerImportTemplate}
                   >
-                    Descargar plantilla
+                    {t('import.downloadTemplate')}
                   </button>
                   <button
                     className="primary-button"
@@ -1936,7 +1950,7 @@ function App({ googleClientIdConfigured }: AppProps) {
                     disabled={importLoading}
                     onClick={() => spreadsheetInputRef.current?.click()}
                   >
-                    {importLoading ? 'Procesando...' : 'Subir planilla'}
+                    {importLoading ? t('common.processing') : t('import.uploadSheet')}
                   </button>
                 </div>
                 <input
@@ -1949,10 +1963,9 @@ function App({ googleClientIdConfigured }: AppProps) {
               </article>
 
               <article className="import-card">
-                <strong>Foto de ficha</strong>
+                <strong>{t('import.photoTitle')}</strong>
                 <p>
-                  Sacá o subí una foto del formulario impreso. El sistema lee el texto y completa
-                  apellido, DNI, teléfonos y obra social cuando los detecta.
+                  {t('import.photoDesc')}
                 </p>
                 <div className="import-buttons">
                   <button
@@ -1961,7 +1974,7 @@ function App({ googleClientIdConfigured }: AppProps) {
                     disabled={importLoading}
                     onClick={() => photoInputRef.current?.click()}
                   >
-                    Elegir foto
+                    {t('import.choosePhoto')}
                   </button>
                   <button
                     className="primary-button"
@@ -1970,8 +1983,8 @@ function App({ googleClientIdConfigured }: AppProps) {
                     onClick={handlePhotoImport}
                   >
                     {importLoading && photoFile
-                      ? `Leyendo foto ${importProgress}%`
-                      : 'Extraer datos de foto'}
+                      ? t('import.readingPhoto', { progress: importProgress })
+                      : t('import.extractPhoto')}
                   </button>
                 </div>
                 <input
@@ -1984,8 +1997,8 @@ function App({ googleClientIdConfigured }: AppProps) {
                 />
                 {photoPreviewUrl ? (
                   <figure className="import-photo-preview">
-                    <img src={photoPreviewUrl} alt="Vista previa de la ficha cargada" />
-                    <figcaption>Vista previa de la ficha</figcaption>
+                    <img src={photoPreviewUrl} alt={t('import.previewAlt')} />
+                    <figcaption>{t('import.previewCaption')}</figcaption>
                   </figure>
                 ) : null}
               </article>
@@ -1997,55 +2010,55 @@ function App({ googleClientIdConfigured }: AppProps) {
 
         <form className="data-form data-form-expanded" onSubmit={handleAthleteSubmit}>
           <label>
-            Nro. socio
+            {t('form.memberNumber')}
             <input
               type="text"
               value={newAthlete.memberNumber}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, memberNumber: event.target.value }))
               }
-              placeholder="Ej: 4613"
+              placeholder={t('form.placeholder.memberNumber')}
             />
           </label>
 
           <label>
-            Apellido
+            {t('form.lastName')}
             <input
               type="text"
               value={newAthlete.lastName}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, lastName: event.target.value }))
               }
-              placeholder="Ej: Mendivil"
+              placeholder={t('form.placeholder.lastName')}
             />
           </label>
 
           <label>
-            Nombre
+            {t('form.firstName')}
             <input
               type="text"
               value={newAthlete.firstName}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, firstName: event.target.value }))
               }
-              placeholder="Ej: Benicio"
+              placeholder={t('form.placeholder.firstName')}
             />
           </label>
 
           <label>
-            DNI
+            {t('form.dni')}
             <input
               type="text"
               value={newAthlete.dni}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, dni: event.target.value }))
               }
-              placeholder="Ej: 60.910.046"
+              placeholder={t('form.placeholder.dni')}
             />
           </label>
 
           <label>
-            Deporte
+            {t('form.sport')}
             <select
               value={newAthlete.sport}
               onChange={(event) =>
@@ -2061,31 +2074,31 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
-            Equipo
+            {t('form.team')}
             <input
               type="text"
               value={newAthlete.team}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, team: event.target.value }))
               }
-              placeholder="Ej: Rugby M8"
+              placeholder={t('form.placeholder.team')}
             />
           </label>
 
           <label>
-            Camada
+            {t('form.cohort')}
             <input
               type="text"
               value={newAthlete.cohort}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, cohort: event.target.value }))
               }
-              placeholder="Ej: Camada 2018"
+              placeholder={t('form.placeholder.cohort')}
             />
           </label>
 
           <label>
-            Activo
+            {t('form.memberStatus')}
             <select
               value={newAthlete.memberStatus}
               onChange={(event) =>
@@ -2095,13 +2108,13 @@ function App({ googleClientIdConfigured }: AppProps) {
                 }))
               }
             >
-              <option value="Activo">Activo</option>
-              <option value="Inactivo">Inactivo</option>
+              <option value="Activo">{translateMemberStatus(selectedLanguage, 'Activo')}</option>
+              <option value="Inactivo">{translateMemberStatus(selectedLanguage, 'Inactivo')}</option>
             </select>
           </label>
 
           <label>
-            Asistencia
+            {t('form.attendance')}
             <select
               value={newAthlete.status}
               onChange={(event) =>
@@ -2111,8 +2124,8 @@ function App({ googleClientIdConfigured }: AppProps) {
                 }))
               }
             >
-              <option value="Presente">Presente</option>
-              <option value="Ausente">Ausente</option>
+              <option value="Presente">{translateAttendanceStatus(selectedLanguage, 'Presente')}</option>
+              <option value="Ausente">{translateAttendanceStatus(selectedLanguage, 'Ausente')}</option>
             </select>
           </label>
 
@@ -2127,107 +2140,107 @@ function App({ googleClientIdConfigured }: AppProps) {
                 }))
               }
             />
-            Medalla por asistencia perfecta 30 días
+            {t('form.perfectAttendance')}
           </label>
 
           <label>
-            Domicilio
+            {t('form.address')}
             <input
               type="text"
               value={newAthlete.address}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, address: event.target.value }))
               }
-              placeholder="Ej: Avenida Paraguay 526"
+              placeholder={t('form.placeholder.address')}
             />
           </label>
 
           <label>
-            Fecha nacimiento
+            {t('form.birthDate')}
             <input
               type="text"
               value={newAthlete.birthDate}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, birthDate: event.target.value }))
               }
-              placeholder="Ej: 27/02/2018"
+              placeholder={t('form.placeholder.birthDate')}
             />
           </label>
 
           <label>
-            Edad
+            {t('form.age')}
             <input
               type="text"
               value={newAthlete.age}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, age: event.target.value }))
               }
-              placeholder="Ej: 8"
+              placeholder={t('form.placeholder.age')}
             />
           </label>
 
           <label>
-            Celular jugador
+            {t('form.playerPhone')}
             <input
               type="text"
               value={newAthlete.playerPhone}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, playerPhone: event.target.value }))
               }
-              placeholder="Ej: 3874098343"
+              placeholder={t('form.placeholder.playerPhone')}
             />
           </label>
 
           <label>
-            Celular padre
+            {t('form.fatherPhone')}
             <input
               type="text"
               value={newAthlete.fatherPhone}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, fatherPhone: event.target.value }))
               }
-              placeholder="Ej: 3875001001"
+              placeholder={t('form.placeholder.fatherPhone')}
             />
           </label>
 
           <label>
-            Celular madre
+            {t('form.motherPhone')}
             <input
               type="text"
               value={newAthlete.motherPhone}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, motherPhone: event.target.value }))
               }
-              placeholder="Ej: 3875001002"
+              placeholder={t('form.placeholder.motherPhone')}
             />
           </label>
 
           <label>
-            Email
+            {t('form.email')}
             <input
               type="email"
               value={newAthlete.email}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, email: event.target.value }))
               }
-              placeholder="Ej: jugador@email.com"
+              placeholder={t('form.placeholder.email')}
             />
           </label>
 
           <label>
-            Obra social
+            {t('form.healthInsurance')}
             <input
               type="text"
               value={newAthlete.healthInsurance}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, healthInsurance: event.target.value }))
               }
-              placeholder="Ej: OSDE"
+              placeholder={t('form.placeholder.healthInsurance')}
             />
           </label>
 
           <label>
-            Número obra social
+            {t('form.healthInsuranceNumber')}
             <input
               type="text"
               value={newAthlete.healthInsuranceNumber}
@@ -2237,48 +2250,48 @@ function App({ googleClientIdConfigured }: AppProps) {
                   healthInsuranceNumber: event.target.value,
                 }))
               }
-              placeholder="Ej: 2-4613-08"
+              placeholder={t('form.placeholder.healthInsuranceNumber')}
             />
           </label>
 
           <label>
-            Forma de pago
+            {t('form.paymentMethod')}
             <input
               type="text"
               value={newAthlete.paymentMethod}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, paymentMethod: event.target.value }))
               }
-              placeholder="Ej: Mercado Pago"
+              placeholder={t('form.placeholder.paymentMethod')}
             />
           </label>
 
           <label>
-            Tipo socio
+            {t('form.membershipType')}
             <input
               type="text"
               value={newAthlete.membershipType}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, membershipType: event.target.value }))
               }
-              placeholder="Ej: Menor familia"
+              placeholder={t('form.placeholder.membershipType')}
             />
           </label>
 
           <label>
-            Próximo cobro
+            {t('form.nextBilling')}
             <input
               type="text"
               value={newAthlete.nextBillingDate}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, nextBillingDate: event.target.value }))
               }
-              placeholder="Ej: 30/04/2026"
+              placeholder={t('form.placeholder.nextBilling')}
             />
           </label>
 
           <label>
-            Entrenamientos asistidos
+            {t('form.trainingsAttended')}
             <input
               type="number"
               min="0"
@@ -2291,7 +2304,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
-            Entrenamientos totales
+            {t('form.trainingsTotal')}
             <input
               type="number"
               min="0"
@@ -2304,7 +2317,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
-            Partidos asistidos
+            {t('form.matchesAttended')}
             <input
               type="number"
               min="0"
@@ -2317,7 +2330,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
-            Partidos totales
+            {t('form.matchesTotal')}
             <input
               type="number"
               min="0"
@@ -2330,7 +2343,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
-            Giras asistidas
+            {t('form.toursAttended')}
             <input
               type="number"
               min="0"
@@ -2343,7 +2356,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
-            Giras totales
+            {t('form.toursTotal')}
             <input
               type="number"
               min="0"
@@ -2363,7 +2376,7 @@ function App({ googleClientIdConfigured }: AppProps) {
                 setNewAthlete((current) => ({ ...current, stayedAsGuest: event.target.checked }))
               }
             />
-            Se hospeda en gira
+            {t('form.staysGuest')}
           </label>
 
           <label className="checkbox-field">
@@ -2374,27 +2387,27 @@ function App({ googleClientIdConfigured }: AppProps) {
                 setNewAthlete((current) => ({ ...current, hostedGuest: event.target.checked }))
               }
             />
-            Hospeda a otro jugador
+            {t('form.hostsOther')}
           </label>
 
           <button className="primary-button form-button" type="submit">
-            Guardar registro
+            {t('form.save')}
           </button>
           <button className="export-button" type="button" onClick={exportAthletesToExcel}>
-            Exportar Excel
+            {t('form.export')}
           </button>
         </form>
 
         {saveMessage ? <p className="save-message">{saveMessage}</p> : null}
 
-        <div className="data-table" aria-label="Registros cargados">
+        <div className="data-table" aria-label={t('table.loadedRecords')}>
           <div className="data-table-header">
-            <span>Nro. socio</span>
-            <span>Jugador</span>
-            <span>DNI</span>
-            <span>Deporte</span>
-            <span>Medalla 30 días</span>
-            <span>Asistencia</span>
+            <span>{t('profile.memberNumber')}</span>
+            <span>{t('table.player')}</span>
+            <span>{t('profile.dni')}</span>
+            <span>{t('profile.sport')}</span>
+            <span>{t('table.medal30')}</span>
+            <span>{t('profile.attendance')}</span>
           </div>
           {athleteList.map((athlete) => (
             <article className="data-table-row" key={athlete.id}>
@@ -2403,10 +2416,12 @@ function App({ googleClientIdConfigured }: AppProps) {
               <span>{athlete.dni}</span>
               <span>{athlete.sport}</span>
               <span className={athlete.perfectAttendance30Days ? 'medal-badge' : 'muted-badge'}>
-                {athlete.perfectAttendance30Days ? '🏅 Perfecta' : 'Sin medalla'}
+                {athlete.perfectAttendance30Days
+                  ? `🏅 ${t('table.perfectMedal')}`
+                  : t('table.noMedal')}
               </span>
               <span className={`status status-${athlete.status.toLowerCase()}`}>
-                {athlete.status}
+                {translateAttendanceStatus(selectedLanguage, athlete.status)}
               </span>
             </article>
           ))}
@@ -2415,56 +2430,55 @@ function App({ googleClientIdConfigured }: AppProps) {
 
       <section className="report-panel" id="reportes" aria-labelledby="report-title">
         <div className="section-heading">
-          <p className="eyebrow">Reportes</p>
-          <h2 id="report-title">Ejemplo de reporte de asistencia</h2>
+          <p className="eyebrow">{t('report.eyebrow')}</p>
+          <h2 id="report-title">{t('report.title')}</h2>
           <p>
-            Este ejemplo muestra como Sportia puede medir asistencia por deportista o de forma
-            general para toda una división, equipo o camada.
+            {t('report.desc')}
           </p>
         </div>
 
-        <div className="report-filters" aria-label="Filtros de reporte">
+        <div className="report-filters" aria-label={t('report.filters')}>
           <label>
-            Periodo
+            {t('report.period')}
             <select
               value={reportPeriod}
               onChange={(event) => setReportPeriod(event.target.value as ReportPeriod)}
             >
               {reportPeriods.map((period) => (
                 <option value={period} key={period}>
-                  {period}
+                  {translateReportPeriod(selectedLanguage, period)}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            Deporte
+            {t('form.sport')}
             <select value={reportSport} onChange={(event) => handleReportSportChange(event.target.value)}>
-              {[allSportsReportOption, ...sportOptions].map((sport) => (
+              {[ALL_SPORTS_VALUE, ...sportOptions].map((sport) => (
                 <option value={sport} key={sport}>
-                  {sport}
+                  {sport === ALL_SPORTS_VALUE ? getAllSportsLabel(selectedLanguage) : sport}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            Alcance
+            {t('report.scope')}
             <select
               value={reportScope}
               onChange={(event) => handleReportScopeChange(event.target.value as ReportScope)}
             >
               {reportScopes.map((scope) => (
                 <option value={scope} key={scope}>
-                  {scope}
+                  {translateReportScope(selectedLanguage, scope)}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            {reportScope === 'Individual' ? 'Jugador' : reportScope}
+            {reportScope === 'Individual' ? t('report.player') : translateReportScope(selectedLanguage, reportScope)}
             <select value={reportTarget} onChange={(event) => setReportTarget(event.target.value)}>
               {reportTargetOptions.map((target) => (
                 <option value={target} key={target}>
@@ -2477,43 +2491,43 @@ function App({ googleClientIdConfigured }: AppProps) {
 
         <div className="report-summary">
           <article>
-            <span>Reporte</span>
+            <span>{t('report.summary.label')}</span>
             <strong>
-              {reportPeriod} · {reportSport} · {reportTarget}
+              {translateReportPeriod(selectedLanguage, reportPeriod)} · {reportSport === ALL_SPORTS_VALUE ? getAllSportsLabel(selectedLanguage) : reportSport} · {reportTarget}
             </strong>
           </article>
           <article>
-            <span>Promedio</span>
+            <span>{t('report.summary.average')}</span>
             <strong>{reportAverage}%</strong>
           </article>
           <article>
-            <span>Mejor marca</span>
+            <span>{t('report.summary.peak')}</span>
             <strong>
-              {reportPeak.attendance}% en {reportPeak.label}
+              {t('report.summary.peakValue', { value: reportPeak.attendance, label: reportPeak.label })}
             </strong>
           </article>
           <article>
-            <span>Medallas 30 días</span>
+            <span>{t('report.summary.medals')}</span>
             <strong>{perfectAttendanceCount}</strong>
           </article>
         </div>
 
-        <div className="medal-report-card" aria-label="Gráfico de medallas por asistencia perfecta">
+        <div className="medal-report-card" aria-label={t('report.medal.aria')}>
           <div className="medal-graphic" aria-hidden="true">
             <span>★</span>
           </div>
           <div>
-            <p className="eyebrow">Asistencia perfecta</p>
-            <h3>{perfectAttendanceCount} jugadores con medalla</h3>
+            <p className="eyebrow">{t('report.medal.eyebrow')}</p>
+            <h3>{t('report.medal.title', { count: perfectAttendanceCount })}</h3>
             <p>
-              La medalla se asigna cuando el jugador completa 30 días sin ausencias en su ficha.
+              {t('report.medal.desc')}
             </p>
           </div>
         </div>
 
         <div
           className="chart-card"
-          aria-label={`Gráfico de asistencia ${reportPeriod} de ${reportSport}`}
+          aria-label={t('report.chart.aria', { period: translateReportPeriod(selectedLanguage, reportPeriod), sport: reportSport === ALL_SPORTS_VALUE ? getAllSportsLabel(selectedLanguage) : reportSport })}
         >
           <div className="chart-grid" aria-hidden="true">
             {reportSeries.map((item) => (
@@ -2528,30 +2542,24 @@ function App({ googleClientIdConfigured }: AppProps) {
           </div>
         </div>
 
-        <p className="report-note">
-          Ejemplo: si elegís <strong>Fútbol</strong>, todo el gráfico se recalcula para Fútbol.
-          Si además elegís <strong>Individual</strong>, muestra un deportista de ese deporte; con{' '}
-          <strong>División</strong>, <strong>Equipo</strong> o <strong>Camada</strong>, muestra el
-          consolidado del grupo seleccionado dentro de ese deporte.
-        </p>
+        <p className="report-note">{t('report.note')}</p>
       </section>
 
       <section className="content-grid single-panel-grid">
         <div className="panel accent-panel" id="equipos">
-          <p className="eyebrow">Siguiente paso</p>
-          <h2>Primer modulo listo para conectar datos reales.</h2>
+          <p className="eyebrow">{t('panel.eyebrow')}</p>
+          <h2>{t('panel.title')}</h2>
           <p>
-            Esta base deja preparada la experiencia principal: registrar asistencia,
-            visualizar indicadores y ordenar entrenamientos por deporte o equipo.
+            {t('panel.desc')}
           </p>
           <a className="secondary-button light" href="#carga-datos">
-            Empezar carga
+            {t('panel.start')}
           </a>
         </div>
       </section>
         </>
       ) : null}
-      <AdSlot {...adSlots[2]} />
+      <AdSlot title={t('ad.footer.title')} placement={t('ad.footer.placement')} size={adSlots[2].size} t={t} />
     </main>
   );
 }
