@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
 type AttendanceStatus = 'Presente' | 'Ausente' | 'Tarde';
+type UserRole = 'Usuario' | 'Staff' | 'Coordinación';
 type ReportPeriod =
   | 'Diario'
   | 'Semanal'
@@ -32,6 +33,17 @@ type Athlete = {
   membershipType: string;
   nextBillingDate: string;
   sport: string;
+  team: string;
+  cohort: string;
+  perfectAttendance30Days: boolean;
+  trainingsAttended: number;
+  trainingsTotal: number;
+  matchesAttended: number;
+  matchesTotal: number;
+  toursAttended: number;
+  toursTotal: number;
+  stayedAsGuest: boolean;
+  hostedGuest: boolean;
   status: AttendanceStatus;
 };
 
@@ -81,6 +93,8 @@ const sportOptions = [
 ];
 
 const allSportsReportOption = 'Todos los deportes';
+const userRoles: UserRole[] = ['Usuario', 'Staff', 'Coordinación'];
+const rankingScopes = ['Camada', 'Edad', 'Equipo'] as const;
 
 const reportPeriods: ReportPeriod[] = [
   'Diario',
@@ -171,8 +185,28 @@ function getAthleteFullName(athlete: Athlete) {
   return `${athlete.lastName} ${athlete.firstName}`.trim();
 }
 
+function ratio(attended: number, total: number) {
+  return total > 0 ? attended / total : 0;
+}
+
+function calculateRankingScore(athlete: Athlete) {
+  const trainingScore = ratio(athlete.trainingsAttended, athlete.trainingsTotal) * 45;
+  const matchScore = ratio(athlete.matchesAttended, athlete.matchesTotal) * 30;
+  const tourScore = ratio(athlete.toursAttended, athlete.toursTotal) * 15;
+  const hostingScore = (athlete.stayedAsGuest ? 5 : 0) + (athlete.hostedGuest ? 5 : 0);
+  const medalBonus = athlete.perfectAttendance30Days ? 10 : 0;
+
+  return Math.round(trainingScore + matchScore + tourScore + hostingScore + medalBonus);
+}
+
 function csvCell(value: string | number) {
   return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+function numberFromForm(value: string) {
+  const parsedValue = Number(value);
+
+  return Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
 }
 
 const initialAthletes: Athlete[] = [
@@ -196,6 +230,17 @@ const initialAthletes: Athlete[] = [
     membershipType: 'Menor familia',
     nextBillingDate: '30/04/2026',
     sport: 'Rugby',
+    team: 'Rugby M8',
+    cohort: 'Camada 2018',
+    perfectAttendance30Days: true,
+    trainingsAttended: 12,
+    trainingsTotal: 12,
+    matchesAttended: 4,
+    matchesTotal: 4,
+    toursAttended: 1,
+    toursTotal: 1,
+    stayedAsGuest: true,
+    hostedGuest: true,
     status: 'Presente',
   },
   {
@@ -218,6 +263,17 @@ const initialAthletes: Athlete[] = [
     membershipType: 'Jugador juvenil',
     nextBillingDate: '30/04/2026',
     sport: 'Fútbol',
+    team: 'Fútbol Sub 14',
+    cohort: 'Camada 2011',
+    perfectAttendance30Days: true,
+    trainingsAttended: 11,
+    trainingsTotal: 12,
+    matchesAttended: 3,
+    matchesTotal: 4,
+    toursAttended: 1,
+    toursTotal: 1,
+    stayedAsGuest: false,
+    hostedGuest: true,
     status: 'Presente',
   },
   {
@@ -240,6 +296,17 @@ const initialAthletes: Athlete[] = [
     membershipType: 'Jugador juvenil',
     nextBillingDate: '30/04/2026',
     sport: 'Baloncesto',
+    team: 'Baloncesto Sub 15',
+    cohort: 'Camada 2010',
+    perfectAttendance30Days: false,
+    trainingsAttended: 9,
+    trainingsTotal: 12,
+    matchesAttended: 4,
+    matchesTotal: 5,
+    toursAttended: 0,
+    toursTotal: 1,
+    stayedAsGuest: true,
+    hostedGuest: false,
     status: 'Tarde',
   },
   {
@@ -262,6 +329,17 @@ const initialAthletes: Athlete[] = [
     membershipType: 'Jugadora juvenil',
     nextBillingDate: '30/04/2026',
     sport: 'Voleibol',
+    team: 'Voleibol Sub 13',
+    cohort: 'Camada 2012',
+    perfectAttendance30Days: false,
+    trainingsAttended: 8,
+    trainingsTotal: 12,
+    matchesAttended: 2,
+    matchesTotal: 4,
+    toursAttended: 1,
+    toursTotal: 2,
+    stayedAsGuest: false,
+    hostedGuest: false,
     status: 'Ausente',
   },
 ];
@@ -403,6 +481,7 @@ function LoginScreen({
 
 function App({ googleClientIdConfigured }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>('Staff');
   const [authError, setAuthError] = useState<string | null>(null);
   const [athleteList, setAthleteList] = useState<Athlete[]>(initialAthletes);
   const [newAthlete, setNewAthlete] = useState({
@@ -424,6 +503,17 @@ function App({ googleClientIdConfigured }: AppProps) {
     membershipType: '',
     nextBillingDate: '',
     sport: sportOptions[0],
+    team: '',
+    cohort: '',
+    perfectAttendance30Days: false,
+    trainingsAttended: '0',
+    trainingsTotal: '0',
+    matchesAttended: '0',
+    matchesTotal: '0',
+    toursAttended: '0',
+    toursTotal: '0',
+    stayedAsGuest: false,
+    hostedGuest: false,
     status: 'Presente' as AttendanceStatus,
   });
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -432,8 +522,11 @@ function App({ googleClientIdConfigured }: AppProps) {
   const [reportScope, setReportScope] = useState<ReportScope>('General');
   const [reportTarget, setReportTarget] = useState(reportGroupsByScope.General[0]);
   const presentCount = athleteList.filter((athlete) => athlete.status === 'Presente').length;
+  const isPrivilegedUser = userRole === 'Staff' || userRole === 'Coordinación';
   const attendancePercentage = Math.round((presentCount / athleteList.length) * 100);
-  const teamCount = new Set(athleteList.map((athlete) => athlete.sport)).size;
+  const perfectAttendanceCount = athleteList.filter(
+    (athlete) => athlete.perfectAttendance30Days,
+  ).length;
   const reportSeries = buildSportReportSeries(reportPeriod, reportSport);
   const reportAverage = Math.round(
     reportSeries.reduce((total, item) => total + item.attendance, 0) / reportSeries.length,
@@ -451,10 +544,57 @@ function App({ googleClientIdConfigured }: AppProps) {
       : ['Sin deportistas cargados'];
   const reportTargetOptions =
     reportScope === 'Individual' ? individualReportTargets : reportGroupsByScope[reportScope];
+  const [rankingSport, setRankingSport] = useState(allSportsReportOption);
+  const [rankingScope, setRankingScope] = useState<(typeof rankingScopes)[number]>('Camada');
+  const rankingCandidates =
+    rankingSport === allSportsReportOption
+      ? athleteList
+      : athleteList.filter((athlete) => athlete.sport === rankingSport);
+  const rankingGroupOptions = Array.from(
+    new Set(
+      rankingCandidates.map((athlete) => {
+        if (rankingScope === 'Camada') {
+          return athlete.cohort;
+        }
+
+        if (rankingScope === 'Edad') {
+          return `${athlete.age} años`;
+        }
+
+        return athlete.team;
+      }),
+    ),
+  ).filter(Boolean);
+  const [rankingGroup, setRankingGroup] = useState('Todos');
+  const normalizedRankingGroup =
+    rankingGroup === 'Todos' || rankingGroupOptions.includes(rankingGroup)
+      ? rankingGroup
+      : 'Todos';
+  const rankedAthletes = rankingCandidates
+    .filter((athlete) => {
+      if (normalizedRankingGroup === 'Todos') {
+        return true;
+      }
+
+      if (rankingScope === 'Camada') {
+        return athlete.cohort === normalizedRankingGroup;
+      }
+
+      if (rankingScope === 'Edad') {
+        return `${athlete.age} años` === normalizedRankingGroup;
+      }
+
+      return athlete.team === normalizedRankingGroup;
+    })
+    .map((athlete) => ({
+      athlete,
+      score: calculateRankingScore(athlete),
+    }))
+    .sort((left, right) => right.score - left.score);
   const metrics = [
     { label: 'Deportistas cargados', value: String(athleteList.length) },
     { label: 'Asistencia de hoy', value: `${attendancePercentage}%` },
-    { label: 'Deportes activos', value: String(teamCount) },
+    { label: 'Medallas 30 días', value: String(perfectAttendanceCount) },
   ];
 
   const handleGoogleSuccess = (response: CredentialResponse) => {
@@ -510,6 +650,17 @@ function App({ googleClientIdConfigured }: AppProps) {
       membershipType: newAthlete.membershipType.trim(),
       nextBillingDate: newAthlete.nextBillingDate.trim(),
       sport: trimmedSport,
+      team: newAthlete.team.trim(),
+      cohort: newAthlete.cohort.trim(),
+      perfectAttendance30Days: newAthlete.perfectAttendance30Days,
+      trainingsAttended: numberFromForm(newAthlete.trainingsAttended),
+      trainingsTotal: numberFromForm(newAthlete.trainingsTotal),
+      matchesAttended: numberFromForm(newAthlete.matchesAttended),
+      matchesTotal: numberFromForm(newAthlete.matchesTotal),
+      toursAttended: numberFromForm(newAthlete.toursAttended),
+      toursTotal: numberFromForm(newAthlete.toursTotal),
+      stayedAsGuest: newAthlete.stayedAsGuest,
+      hostedGuest: newAthlete.hostedGuest,
       status: newAthlete.status,
     };
 
@@ -533,6 +684,17 @@ function App({ googleClientIdConfigured }: AppProps) {
       membershipType: '',
       nextBillingDate: '',
       sport: sportOptions[0],
+      team: '',
+      cohort: '',
+      perfectAttendance30Days: false,
+      trainingsAttended: '0',
+      trainingsTotal: '0',
+      matchesAttended: '0',
+      matchesTotal: '0',
+      toursAttended: '0',
+      toursTotal: '0',
+      stayedAsGuest: false,
+      hostedGuest: false,
       status: 'Presente',
     });
     setSaveMessage(
@@ -547,7 +709,19 @@ function App({ googleClientIdConfigured }: AppProps) {
       'Nombre',
       'DNI',
       'Deporte',
+      'Equipo',
+      'Camada',
       'Asistencia',
+      'Medalla asistencia perfecta 30 dias',
+      'Entrenamientos asistidos',
+      'Entrenamientos totales',
+      'Partidos asistidos',
+      'Partidos totales',
+      'Giras asistidas',
+      'Giras totales',
+      'Se hospeda',
+      'Hospeda',
+      'Puntaje ranking',
       'Activo',
       'Domicilio',
       'Fecha nacimiento',
@@ -568,7 +742,19 @@ function App({ googleClientIdConfigured }: AppProps) {
       athlete.firstName,
       athlete.dni,
       athlete.sport,
+      athlete.team,
+      athlete.cohort,
       athlete.status,
+      athlete.perfectAttendance30Days ? 'Si' : 'No',
+      athlete.trainingsAttended,
+      athlete.trainingsTotal,
+      athlete.matchesAttended,
+      athlete.matchesTotal,
+      athlete.toursAttended,
+      athlete.toursTotal,
+      athlete.stayedAsGuest ? 'Si' : 'No',
+      athlete.hostedGuest ? 'Si' : 'No',
+      calculateRankingScore(athlete),
       athlete.memberStatus,
       athlete.address,
       athlete.birthDate,
@@ -640,11 +826,12 @@ function App({ googleClientIdConfigured }: AppProps) {
           <span>Sportia</span>
         </a>
         <div className="nav-links">
-          <a href="#asistencia">Asistencia</a>
-          <a href="#carga-datos">Carga</a>
-          <a href="#reportes">Reportes</a>
-          <a href="#equipos">Equipos</a>
-          <a href="#sesiones">Sesiones</a>
+          {isPrivilegedUser ? <a href="#asistencia">Asistencia</a> : null}
+          {isPrivilegedUser ? <a href="#carga-datos">Carga</a> : null}
+          <a href="#ranking">Ranking</a>
+          {isPrivilegedUser ? <a href="#reportes">Reportes</a> : null}
+          {isPrivilegedUser ? <a href="#equipos">Equipos</a> : null}
+          {isPrivilegedUser ? <a href="#sesiones">Sesiones</a> : null}
         </div>
         <div className="user-menu">
           {user.picture ? (
@@ -656,6 +843,16 @@ function App({ googleClientIdConfigured }: AppProps) {
             <strong>{user.name}</strong>
             <span>{user.email}</span>
           </div>
+          <label className="role-selector">
+            Rol
+            <select value={userRole} onChange={(event) => setUserRole(event.target.value as UserRole)}>
+              {userRoles.map((role) => (
+                <option value={role} key={role}>
+                  {role}
+                </option>
+              ))}
+            </select>
+          </label>
           <button className="sign-out-button" type="button" onClick={() => setUser(null)}>
             Salir
           </button>
@@ -671,38 +868,56 @@ function App({ googleClientIdConfigured }: AppProps) {
             como evoluciona la participacion de cada equipo.
           </p>
           <div className="hero-actions">
-            <a className="primary-button" href="#asistencia">
-              Ver asistencia
+            <a className="primary-button" href="#ranking">
+              Ver ranking
             </a>
-            <a className="secondary-button" href="#carga-datos">
-              Cargar datos
-            </a>
-            <a className="secondary-button" href="#reportes">
-              Ver reportes
-            </a>
+            {isPrivilegedUser ? (
+              <a className="secondary-button" href="#carga-datos">
+                Cargar datos
+              </a>
+            ) : null}
+            {isPrivilegedUser ? (
+              <a className="secondary-button" href="#reportes">
+                Ver reportes
+              </a>
+            ) : null}
           </div>
         </div>
 
-        <aside className="attendance-card" id="asistencia" aria-label="Resumen de asistencia de hoy">
-          <div className="card-header">
-            <span>Entrenamiento de hoy</span>
-            <strong>{presentCount}/{athleteList.length}</strong>
-          </div>
-          <h2>Lista rapida</h2>
-          <div className="athlete-list">
-            {athleteList.slice(0, 5).map((athlete) => (
-              <article className="athlete-row" key={athlete.id}>
-                <div>
-                  <strong>{getAthleteFullName(athlete)}</strong>
-                  <span>{athlete.sport} · DNI {athlete.dni}</span>
-                </div>
-                <span className={`status status-${athlete.status.toLowerCase()}`}>
-                  {athlete.status}
-                </span>
-              </article>
-            ))}
-          </div>
-        </aside>
+        {isPrivilegedUser ? (
+          <aside className="attendance-card" id="asistencia" aria-label="Resumen de asistencia de hoy">
+            <div className="card-header">
+              <span>Entrenamiento de hoy</span>
+              <strong>{presentCount}/{athleteList.length}</strong>
+            </div>
+            <h2>Lista rapida</h2>
+            <div className="athlete-list">
+              {athleteList.slice(0, 5).map((athlete) => (
+                <article className="athlete-row" key={athlete.id}>
+                  <div>
+                    <strong>{getAthleteFullName(athlete)}</strong>
+                    <span>{athlete.sport} · DNI {athlete.dni}</span>
+                  </div>
+                  <span className={`status status-${athlete.status.toLowerCase()}`}>
+                    {athlete.status}
+                  </span>
+                </article>
+              ))}
+            </div>
+          </aside>
+        ) : (
+          <aside className="attendance-card public-access-card">
+            <p className="eyebrow">Vista pública</p>
+            <h2>Ranking disponible para todos.</h2>
+            <p>
+              La carga de fichas, reportes internos y datos personales quedan reservados para
+              Staff y Coordinación.
+            </p>
+            <a className="primary-button" href="#ranking">
+              Ir al ranking
+            </a>
+          </aside>
+        )}
       </section>
 
       <section className="metrics-grid" aria-label="Metricas principales">
@@ -714,6 +929,87 @@ function App({ googleClientIdConfigured }: AppProps) {
         ))}
       </section>
 
+      <section className="ranking-panel" id="ranking" aria-labelledby="ranking-title">
+        <div className="section-heading">
+          <p className="eyebrow">Ranking público</p>
+          <h2 id="ranking-title">Ranking por asistencia y compromiso</h2>
+          <p>
+            Visible para todos los usuarios. Ordena jugadores que comparten camada, edad o equipo,
+            considerando entrenamientos, partidos, giras, si se hospeda y si hospeda a otro jugador.
+          </p>
+        </div>
+
+        <div className="report-filters" aria-label="Filtros de ranking">
+          <label>
+            Deporte
+            <select value={rankingSport} onChange={(event) => setRankingSport(event.target.value)}>
+              {[allSportsReportOption, ...sportOptions].map((sport) => (
+                <option value={sport} key={sport}>
+                  {sport}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Comparar por
+            <select
+              value={rankingScope}
+              onChange={(event) =>
+                setRankingScope(event.target.value as (typeof rankingScopes)[number])
+              }
+            >
+              {rankingScopes.map((scope) => (
+                <option value={scope} key={scope}>
+                  {scope}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Grupo
+            <select value={normalizedRankingGroup} onChange={(event) => setRankingGroup(event.target.value)}>
+              <option value="Todos">Todos</option>
+              {rankingGroupOptions.map((group) => (
+                <option value={group} key={group}>
+                  {group}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="ranking-list">
+          {rankedAthletes.map(({ athlete, score }, index) => (
+            <article className="ranking-row" key={athlete.id}>
+              <span className="ranking-position">#{index + 1}</span>
+              <div>
+                <strong>{getAthleteFullName(athlete)}</strong>
+                <span>
+                  {athlete.team || athlete.sport} · {athlete.cohort || `${athlete.age} años`}
+                </span>
+              </div>
+              {athlete.perfectAttendance30Days ? (
+                <span className="medal-badge">🏅 30 días</span>
+              ) : (
+                <span className="muted-badge">Sin medalla</span>
+              )}
+              <div className="ranking-breakdown">
+                <span>Entr. {athlete.trainingsAttended}/{athlete.trainingsTotal}</span>
+                <span>Part. {athlete.matchesAttended}/{athlete.matchesTotal}</span>
+                <span>Giras {athlete.toursAttended}/{athlete.toursTotal}</span>
+                <span>{athlete.stayedAsGuest ? 'Se hospeda' : 'No se hospeda'}</span>
+                <span>{athlete.hostedGuest ? 'Hospeda' : 'No hospeda'}</span>
+              </div>
+              <strong className="ranking-score">{score} pts</strong>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {isPrivilegedUser ? (
+        <>
       <section className="data-entry-panel" id="carga-datos" aria-labelledby="data-entry-title">
         <div className="section-heading">
           <p className="eyebrow">Carga de datos</p>
@@ -790,6 +1086,30 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
+            Equipo
+            <input
+              type="text"
+              value={newAthlete.team}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, team: event.target.value }))
+              }
+              placeholder="Ej: Rugby M8"
+            />
+          </label>
+
+          <label>
+            Camada
+            <input
+              type="text"
+              value={newAthlete.cohort}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, cohort: event.target.value }))
+              }
+              placeholder="Ej: Camada 2018"
+            />
+          </label>
+
+          <label>
             Activo
             <select
               value={newAthlete.memberStatus}
@@ -820,6 +1140,20 @@ function App({ googleClientIdConfigured }: AppProps) {
               <option value="Tarde">Tarde</option>
               <option value="Ausente">Ausente</option>
             </select>
+          </label>
+
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={newAthlete.perfectAttendance30Days}
+              onChange={(event) =>
+                setNewAthlete((current) => ({
+                  ...current,
+                  perfectAttendance30Days: event.target.checked,
+                }))
+              }
+            />
+            Medalla por asistencia perfecta 30 días
           </label>
 
           <label>
@@ -969,6 +1303,106 @@ function App({ googleClientIdConfigured }: AppProps) {
             />
           </label>
 
+          <label>
+            Entrenamientos asistidos
+            <input
+              type="number"
+              min="0"
+              value={newAthlete.trainingsAttended}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, trainingsAttended: event.target.value }))
+              }
+              placeholder="Ej: 12"
+            />
+          </label>
+
+          <label>
+            Entrenamientos totales
+            <input
+              type="number"
+              min="0"
+              value={newAthlete.trainingsTotal}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, trainingsTotal: event.target.value }))
+              }
+              placeholder="Ej: 12"
+            />
+          </label>
+
+          <label>
+            Partidos asistidos
+            <input
+              type="number"
+              min="0"
+              value={newAthlete.matchesAttended}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, matchesAttended: event.target.value }))
+              }
+              placeholder="Ej: 4"
+            />
+          </label>
+
+          <label>
+            Partidos totales
+            <input
+              type="number"
+              min="0"
+              value={newAthlete.matchesTotal}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, matchesTotal: event.target.value }))
+              }
+              placeholder="Ej: 4"
+            />
+          </label>
+
+          <label>
+            Giras asistidas
+            <input
+              type="number"
+              min="0"
+              value={newAthlete.toursAttended}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, toursAttended: event.target.value }))
+              }
+              placeholder="Ej: 1"
+            />
+          </label>
+
+          <label>
+            Giras totales
+            <input
+              type="number"
+              min="0"
+              value={newAthlete.toursTotal}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, toursTotal: event.target.value }))
+              }
+              placeholder="Ej: 1"
+            />
+          </label>
+
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={newAthlete.stayedAsGuest}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, stayedAsGuest: event.target.checked }))
+              }
+            />
+            Se hospeda en gira
+          </label>
+
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={newAthlete.hostedGuest}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, hostedGuest: event.target.checked }))
+              }
+            />
+            Hospeda a otro jugador
+          </label>
+
           <button className="primary-button form-button" type="submit">
             Guardar registro
           </button>
@@ -985,6 +1419,7 @@ function App({ googleClientIdConfigured }: AppProps) {
             <span>Jugador</span>
             <span>DNI</span>
             <span>Deporte</span>
+            <span>Medalla 30 días</span>
             <span>Asistencia</span>
           </div>
           {athleteList.map((athlete) => (
@@ -993,6 +1428,9 @@ function App({ googleClientIdConfigured }: AppProps) {
               <strong>{getAthleteFullName(athlete)}</strong>
               <span>{athlete.dni}</span>
               <span>{athlete.sport}</span>
+              <span className={athlete.perfectAttendance30Days ? 'medal-badge' : 'muted-badge'}>
+                {athlete.perfectAttendance30Days ? '🏅 Perfecta' : 'Sin medalla'}
+              </span>
               <span className={`status status-${athlete.status.toLowerCase()}`}>
                 {athlete.status}
               </span>
@@ -1080,6 +1518,23 @@ function App({ googleClientIdConfigured }: AppProps) {
               {reportPeak.attendance}% en {reportPeak.label}
             </strong>
           </article>
+          <article>
+            <span>Medallas 30 días</span>
+            <strong>{perfectAttendanceCount}</strong>
+          </article>
+        </div>
+
+        <div className="medal-report-card" aria-label="Gráfico de medallas por asistencia perfecta">
+          <div className="medal-graphic" aria-hidden="true">
+            <span>★</span>
+          </div>
+          <div>
+            <p className="eyebrow">Asistencia perfecta</p>
+            <h3>{perfectAttendanceCount} jugadores con medalla</h3>
+            <p>
+              La medalla se asigna cuando el jugador completa 30 días sin ausencias en su ficha.
+            </p>
+          </div>
         </div>
 
         <div
@@ -1141,6 +1596,8 @@ function App({ googleClientIdConfigured }: AppProps) {
           </a>
         </div>
       </section>
+        </>
+      ) : null}
     </main>
   );
 }

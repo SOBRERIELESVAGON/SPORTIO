@@ -9,8 +9,11 @@ App de asistencia a entrenamientos deportivos multi-deporte.
 - Resumen de asistencia de un entrenamiento.
 - Modulo de carga de jugadores con apellido, nombre, DNI, obra social, celulares de jugador/padre/madre y datos de socio separados.
 - Exportacion a Excel/CSV con una columna por cada item de la ficha.
+- Medalla por asistencia perfecta de 30 dias en ficha y reportes.
+- Ranking publico por camada, edad o equipo considerando entrenamientos, partidos, giras y hospedaje.
 - Reportes de asistencia con ejemplo diario, semanal, mensual, bimestral, trimestral, semestral y anual.
 - Vista de reportes por deporte, individual y general por division, equipo o camada.
+- Control de vista por rol: usuarios ven ranking; staff y coordinacion ven carga/reportes internos.
 - Indicadores principales de deportistas, equipos y asistencia.
 - Agenda de proximas sesiones por equipo/deporte.
 

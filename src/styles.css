@@ -244,6 +244,28 @@ button {
   white-space: nowrap;
 }
 
+.role-selector {
+  display: grid;
+  gap: 2px;
+  color: #667b6f;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.role-selector select {
+  min-height: 32px;
+  border: 1px solid #dce8e1;
+  border-radius: 999px;
+  padding: 0 10px;
+  color: #102017;
+  background: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: none;
+}
+
 .user-avatar {
   width: 34px;
   height: 34px;
@@ -379,6 +401,18 @@ button {
   padding: 26px;
 }
 
+.public-access-card {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+}
+
+.public-access-card p:not(.eyebrow) {
+  margin: 0;
+  color: #667b6f;
+  line-height: 1.7;
+}
+
 .card-header {
   justify-content: space-between;
   color: #5d7467;
@@ -481,7 +515,8 @@ button {
 }
 
 .data-entry-panel,
-.report-panel {
+.report-panel,
+.ranking-panel {
   display: grid;
   gap: 22px;
   margin: 0 0 28px;
@@ -516,6 +551,24 @@ button {
   color: #486154;
   font-size: 0.86rem;
   font-weight: 900;
+}
+
+.checkbox-field {
+  display: flex !important;
+  align-items: center;
+  gap: 10px !important;
+  min-height: 50px;
+  border: 1px solid #dce8e1;
+  border-radius: 16px;
+  padding: 0 14px;
+  background: #fbfdfc;
+}
+
+.checkbox-field input {
+  width: 18px;
+  min-height: auto;
+  height: 18px;
+  accent-color: #16a34a;
 }
 
 .data-form input,
@@ -572,10 +625,10 @@ button {
 .data-table-header,
 .data-table-row {
   display: grid;
-  grid-template-columns: 0.65fr 1.25fr 0.9fr 1fr auto;
+  grid-template-columns: 0.65fr 1.25fr 0.9fr 1fr 0.95fr auto;
   gap: 16px;
   align-items: center;
-  min-width: 820px;
+  min-width: 980px;
 }
 
 .data-table-header {
@@ -600,6 +653,25 @@ button {
 
 .data-table-row span:not(.status) {
   color: #667b6f;
+}
+
+.medal-badge,
+.muted-badge {
+  width: fit-content;
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.medal-badge {
+  color: #7c4a03;
+  background: #fef3c7;
+}
+
+.muted-badge {
+  color: #667b6f;
+  background: #eef3f0;
 }
 
 .report-filters {
@@ -636,7 +708,7 @@ button {
 
 .report-summary {
   display: grid;
-  grid-template-columns: 1.4fr 0.7fr 1fr;
+  grid-template-columns: 1.35fr 0.65fr 1fr 0.7fr;
   gap: 14px;
 }
 
@@ -661,6 +733,102 @@ button {
   margin-top: 8px;
   color: #102017;
   font-size: 1.1rem;
+}
+
+.medal-report-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid #fde68a;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #fffbeb, #fff7d6);
+}
+
+.medal-report-card h3 {
+  margin: 0 0 8px;
+  color: #102017;
+  font-size: 1.5rem;
+}
+
+.medal-report-card p:not(.eyebrow) {
+  margin: 0;
+  color: #667b6f;
+  line-height: 1.6;
+}
+
+.medal-graphic {
+  display: grid;
+  width: 92px;
+  height: 92px;
+  place-items: center;
+  border: 10px solid #f59e0b;
+  border-radius: 50%;
+  color: #fff;
+  background: radial-gradient(circle at 35% 30%, #fde68a, #d97706);
+  box-shadow: 0 18px 30px rgba(217, 119, 6, 0.2);
+}
+
+.medal-graphic span {
+  font-size: 2.6rem;
+  text-shadow: 0 2px 8px rgba(124, 74, 3, 0.4);
+}
+
+.ranking-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ranking-row {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1.2fr) auto minmax(220px, 1.4fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #edf2ef;
+  border-radius: 22px;
+  background: #fbfdfc;
+}
+
+.ranking-position {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 14px;
+  color: #fff;
+  background: #0f7a3f;
+  font-weight: 900;
+}
+
+.ranking-row strong {
+  display: block;
+  color: #102017;
+}
+
+.ranking-row span {
+  color: #667b6f;
+}
+
+.ranking-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ranking-breakdown span {
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: #eef7f1;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.ranking-score {
+  color: #0f7a3f !important;
+  font-size: 1.35rem;
+  text-align: right;
 }
 
 .chart-card {
@@ -790,7 +958,8 @@ button {
   .data-form,
   .data-form-expanded,
   .report-filters,
-  .report-summary {
+  .report-summary,
+  .ranking-row {
     grid-template-columns: 1fr;
   }
 
@@ -879,7 +1048,8 @@ button {
   .panel,
   .metric-card,
   .data-entry-panel,
-  .report-panel {
+  .report-panel,
+  .ranking-panel {
     border-radius: 24px;
   }
 
@@ -910,5 +1080,13 @@ button {
 
   .session-meta {
     align-items: flex-start;
+  }
+
+  .medal-report-card {
+    grid-template-columns: 1fr;
+  }
+
+  .ranking-score {
+    text-align: left;
   }
 }
