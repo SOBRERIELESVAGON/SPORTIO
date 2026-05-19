@@ -512,7 +512,8 @@ button {
 .data-entry-panel,
 .report-panel,
 .ranking-panel,
-.operations-panel {
+.operations-panel,
+.player-profile-panel {
   display: grid;
   gap: 22px;
   margin: 0 0 28px;
@@ -934,6 +935,87 @@ button {
   text-align: right;
 }
 
+.access-form,
+.player-access-card {
+  display: grid;
+  gap: 14px;
+}
+
+.access-form label,
+.player-access-card label {
+  display: grid;
+  gap: 8px;
+  color: #486154;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.access-form input,
+.access-form select,
+.player-access-card select {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid #dce8e1;
+  border-radius: 16px;
+  padding: 0 14px;
+  color: #102017;
+  background: #fbfdfc;
+  font: inherit;
+  font-weight: 700;
+}
+
+.player-access-card {
+  padding: 18px;
+  border: 1px solid #edf2ef;
+  border-radius: 22px;
+  background: #fbfdfc;
+}
+
+.player-access-card h3 {
+  margin: 0 0 8px;
+  color: #102017;
+}
+
+.player-access-card p:not(.eyebrow) {
+  margin: 0;
+  color: #667b6f;
+  line-height: 1.6;
+}
+
+.player-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.player-profile-grid article {
+  padding: 18px;
+  border: 1px solid #edf2ef;
+  border-radius: 22px;
+  background: #fbfdfc;
+}
+
+.player-profile-grid span {
+  display: block;
+  color: #667b6f;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-profile-grid strong {
+  display: block;
+  margin-top: 8px;
+  color: #102017;
+}
+
+.player-profile-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .chart-card {
   overflow-x: auto;
   padding: 22px;
@@ -1068,7 +1150,8 @@ button {
   .report-summary,
   .attendance-control-row,
   .tour-control-row,
-  .ranking-row {
+  .ranking-row,
+  .player-profile-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1159,7 +1242,8 @@ button {
   .data-entry-panel,
   .report-panel,
   .ranking-panel,
-  .operations-panel {
+  .operations-panel,
+  .player-profile-panel {
     border-radius: 24px;
   }
 

@@ -3,7 +3,8 @@ import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
 type AttendanceStatus = 'Presente' | 'Ausente';
 type AttendanceActivity = 'Entrenamiento' | 'Partido';
-type UserRole = 'Usuario' | 'Staff' | 'Coordinación';
+type UserRole = 'Jugador' | 'Staff' | 'Coordinación';
+type StaffRole = Exclude<UserRole, 'Jugador'>;
 type ReportPeriod =
   | 'Diario'
   | 'Semanal'
@@ -86,7 +87,11 @@ const sportOptions = [
 ];
 
 const allSportsReportOption = 'Todos los deportes';
-const userRoles: UserRole[] = ['Usuario', 'Staff', 'Coordinación'];
+const staffRoles: StaffRole[] = ['Staff', 'Coordinación'];
+const staffPasswords: Record<StaffRole, string> = {
+  Staff: 'staff2026',
+  Coordinación: 'coord2026',
+};
 const rankingScopes = ['Camada', 'Edad', 'Equipo'] as const;
 
 const reportPeriods: ReportPeriod[] = [
@@ -379,17 +384,40 @@ function userFromGoogleCredential(response: CredentialResponse): AuthenticatedUs
 
 function LoginScreen({
   error,
+  athletes,
   googleClientIdConfigured,
-  onDemoAccess,
-  onGoogleSuccess,
+  onPlayerAccess,
+  onStaffAccess,
   onGoogleError,
 }: {
   error: string | null;
+  athletes: Athlete[];
   googleClientIdConfigured: boolean;
-  onDemoAccess: () => void;
-  onGoogleSuccess: (response: CredentialResponse) => void;
+  onPlayerAccess: (athleteId: number) => void;
+  onStaffAccess: (role: StaffRole, password: string) => void;
   onGoogleError: () => void;
 }) {
+  const [staffRole, setStaffRole] = useState<StaffRole>('Staff');
+  const [staffPassword, setStaffPassword] = useState('');
+  const [selectedAthleteId, setSelectedAthleteId] = useState(athletes[0]?.id ?? 0);
+  const [googleIdentity, setGoogleIdentity] = useState<string | null>(null);
+
+  const handleStaffSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onStaffAccess(staffRole, staffPassword);
+  };
+
+  const handleGoogleSuccess = (response: CredentialResponse) => {
+    const googleUser = userFromGoogleCredential(response);
+
+    if (!googleUser) {
+      onGoogleError();
+      return;
+    }
+
+    setGoogleIdentity(googleUser.email);
+  };
+
   return (
     <main className="login-layout">
       <section className="login-hero">
@@ -397,28 +425,58 @@ function LoginScreen({
           <span className="brand-mark">S</span>
           <span>Sportia</span>
         </a>
-        <p className="eyebrow">Acceso para entrenadores</p>
-        <h1>Entra a Sportia con tu cuenta de Google.</h1>
+        <p className="eyebrow">Acceso por rol</p>
+        <h1>Staff con clave, jugadores con ficha propia.</h1>
         <p>
-          Centraliza asistencia, equipos y entrenamientos con un acceso simple para
-          entrenadores y coordinadores deportivos.
+          Staff y Coordinación administran datos con clave. Los jugadores entran sin clave para
+          ver solo su ficha individual y el ranking.
         </p>
       </section>
 
       <section className="login-card" aria-labelledby="login-title">
         <div>
           <p className="eyebrow">Login</p>
-          <h2 id="login-title">Continuar con Google</h2>
+          <h2 id="login-title">Elegí cómo entrar</h2>
           <p>
-            Usaremos Google Identity Services para validar tu identidad antes de abrir el
-            panel de Sportia.
+            Las claves de demo son <strong>staff2026</strong> para Staff y{' '}
+            <strong>coord2026</strong> para Coordinación.
           </p>
         </div>
+
+        <form className="access-form" onSubmit={handleStaffSubmit}>
+          <label>
+            Rol con clave
+            <select
+              value={staffRole}
+              onChange={(event) => setStaffRole(event.target.value as StaffRole)}
+            >
+              {staffRoles.map((role) => (
+                <option value={role} key={role}>
+                  {role}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Clave
+            <input
+              type="password"
+              value={staffPassword}
+              onChange={(event) => setStaffPassword(event.target.value)}
+              placeholder="Ingresá la clave"
+            />
+          </label>
+
+          <button className="demo-button" type="submit">
+            Entrar como {staffRole}
+          </button>
+        </form>
 
         {googleClientIdConfigured ? (
           <div className="google-login-frame">
             <GoogleLogin
-              onSuccess={onGoogleSuccess}
+              onSuccess={handleGoogleSuccess}
               onError={onGoogleError}
               text="continue_with"
               shape="pill"
@@ -429,19 +487,47 @@ function LoginScreen({
           </div>
         ) : (
           <div className="config-warning" role="status">
-            <strong>Falta configurar Google.</strong>
+            <strong>Google opcional no configurado.</strong>
             <span>
               Crea un archivo <code>.env</code> con <code>VITE_GOOGLE_CLIENT_ID</code>.
-              Mientras tanto puedes entrar en modo demo.
+              Las claves de Staff/Coordinación funcionan igual para esta demo.
             </span>
           </div>
         )}
 
+        {googleIdentity ? (
+          <p className="save-message">Google validó {googleIdentity}. Ingresá la clave del rol.</p>
+        ) : null}
+
         {error ? <p className="auth-error">{error}</p> : null}
 
-        <button className="demo-button" type="button" onClick={onDemoAccess}>
-          Entrar en modo demo
-        </button>
+        <div className="player-access-card">
+          <div>
+            <p className="eyebrow">Jugador</p>
+            <h3>Entrar sin clave</h3>
+            <p>El jugador solo podrá ver su ficha individual y el ranking.</p>
+          </div>
+          <label>
+            Jugador
+            <select
+              value={selectedAthleteId}
+              onChange={(event) => setSelectedAthleteId(Number(event.target.value))}
+            >
+              {athletes.map((athlete) => (
+                <option value={athlete.id} key={athlete.id}>
+                  {getAthleteFullName(athlete)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="export-button"
+            type="button"
+            onClick={() => onPlayerAccess(selectedAthleteId)}
+          >
+            Entrar como jugador
+          </button>
+        </div>
       </section>
     </main>
   );
@@ -449,7 +535,8 @@ function LoginScreen({
 
 function App({ googleClientIdConfigured }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>('Staff');
+  const [userRole, setUserRole] = useState<UserRole>('Jugador');
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [athleteList, setAthleteList] = useState<Athlete[]>(initialAthletes);
   const [newAthlete, setNewAthlete] = useState({
@@ -493,6 +580,7 @@ function App({ googleClientIdConfigured }: AppProps) {
   const [reportTarget, setReportTarget] = useState(reportGroupsByScope.General[0]);
   const presentCount = athleteList.filter((athlete) => athlete.status === 'Presente').length;
   const isPrivilegedUser = userRole === 'Staff' || userRole === 'Coordinación';
+  const selectedPlayer = athleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
   const attendancePercentage = Math.round((presentCount / athleteList.length) * 100);
   const perfectAttendanceCount = athleteList.filter(
     (athlete) => athlete.perfectAttendance30Days,
@@ -567,23 +655,35 @@ function App({ googleClientIdConfigured }: AppProps) {
     { label: 'Medallas 30 días', value: String(perfectAttendanceCount) },
   ];
 
-  const handleGoogleSuccess = (response: CredentialResponse) => {
-    const googleUser = userFromGoogleCredential(response);
-
-    if (!googleUser) {
-      setAuthError('No pudimos leer los datos de Google. Intentalo nuevamente.');
+  const handleStaffAccess = (role: StaffRole, password: string) => {
+    if (staffPasswords[role] !== password) {
+      setAuthError('Clave incorrecta para el rol seleccionado.');
       return;
     }
 
-    setUser(googleUser);
+    setUser({
+      email: `${role.toLowerCase()}@sportia.app`,
+      name: role,
+    });
+    setUserRole(role);
+    setSelectedPlayerId(null);
     setAuthError(null);
   };
 
-  const handleDemoAccess = () => {
+  const handlePlayerAccess = (athleteId: number) => {
+    const athlete = athleteList.find((currentAthlete) => currentAthlete.id === athleteId);
+
+    if (!athlete) {
+      setAuthError('No encontramos la ficha del jugador seleccionado.');
+      return;
+    }
+
     setUser({
-      email: 'demo@sportia.app',
-      name: 'Entrenador demo',
+      email: athlete.email || `${athlete.memberNumber || athlete.id}@sportia.app`,
+      name: getAthleteFullName(athlete),
     });
+    setUserRole('Jugador');
+    setSelectedPlayerId(athlete.id);
     setAuthError(null);
   };
 
@@ -860,10 +960,11 @@ function App({ googleClientIdConfigured }: AppProps) {
     return (
       <LoginScreen
         error={authError}
+        athletes={athleteList}
         googleClientIdConfigured={googleClientIdConfigured}
-        onDemoAccess={handleDemoAccess}
         onGoogleError={() => setAuthError('Google no pudo iniciar sesion. Intentalo otra vez.')}
-        onGoogleSuccess={handleGoogleSuccess}
+        onPlayerAccess={handlePlayerAccess}
+        onStaffAccess={handleStaffAccess}
       />
     );
   }
@@ -878,6 +979,7 @@ function App({ googleClientIdConfigured }: AppProps) {
         <div className="nav-links">
           {isPrivilegedUser ? <a href="#control-asistencia">Asistencia</a> : null}
           {isPrivilegedUser ? <a href="#carga-datos">Carga</a> : null}
+          {userRole === 'Jugador' ? <a href="#mi-ficha">Mi ficha</a> : null}
           <a href="#ranking">Ranking</a>
           {isPrivilegedUser ? <a href="#reportes">Reportes</a> : null}
           {isPrivilegedUser ? <a href="#equipos">Equipos</a> : null}
@@ -890,19 +992,17 @@ function App({ googleClientIdConfigured }: AppProps) {
           )}
           <div>
             <strong>{user.name}</strong>
-            <span>{user.email}</span>
+            <span>{userRole}</span>
           </div>
-          <label className="role-selector">
-            Rol
-            <select value={userRole} onChange={(event) => setUserRole(event.target.value as UserRole)}>
-              {userRoles.map((role) => (
-                <option value={role} key={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="sign-out-button" type="button" onClick={() => setUser(null)}>
+          <button
+            className="sign-out-button"
+            type="button"
+            onClick={() => {
+              setUser(null);
+              setUserRole('Jugador');
+              setSelectedPlayerId(null);
+            }}
+          >
             Salir
           </button>
         </div>
@@ -956,12 +1056,14 @@ function App({ googleClientIdConfigured }: AppProps) {
           </aside>
         ) : (
           <aside className="attendance-card public-access-card">
-            <p className="eyebrow">Vista pública</p>
-            <h2>Ranking disponible para todos.</h2>
+            <p className="eyebrow">Vista jugador</p>
+            <h2>Ficha individual y ranking.</h2>
             <p>
-              La carga de fichas, reportes internos y datos personales quedan reservados para
-              Staff y Coordinación.
+              Entraste como jugador. Solo tenés acceso a tu ficha individual y al ranking público.
             </p>
+            <a className="primary-button" href="#mi-ficha">
+              Ver mi ficha
+            </a>
             <a className="primary-button" href="#ranking">
               Ir al ranking
             </a>
@@ -969,14 +1071,69 @@ function App({ googleClientIdConfigured }: AppProps) {
         )}
       </section>
 
-      <section className="metrics-grid" aria-label="Metricas principales">
-        {metrics.map((metric) => (
-          <article className="metric-card" key={metric.label}>
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-          </article>
-        ))}
-      </section>
+      {isPrivilegedUser ? (
+        <section className="metrics-grid" aria-label="Metricas principales">
+          {metrics.map((metric) => (
+            <article className="metric-card" key={metric.label}>
+              <span>{metric.label}</span>
+              <strong>{metric.value}</strong>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {userRole === 'Jugador' && selectedPlayer ? (
+        <section className="player-profile-panel" id="mi-ficha" aria-labelledby="player-profile-title">
+          <div className="section-heading">
+            <p className="eyebrow">Mi ficha</p>
+            <h2 id="player-profile-title">{getAthleteFullName(selectedPlayer)}</h2>
+            <p>Esta vista es individual: el jugador solo ve su propia ficha y el ranking público.</p>
+          </div>
+
+          <div className="player-profile-grid">
+            <article>
+              <span>Nro. socio</span>
+              <strong>{selectedPlayer.memberNumber || '-'}</strong>
+            </article>
+            <article>
+              <span>DNI</span>
+              <strong>{selectedPlayer.dni}</strong>
+            </article>
+            <article>
+              <span>Deporte</span>
+              <strong>{selectedPlayer.sport}</strong>
+            </article>
+            <article>
+              <span>Equipo</span>
+              <strong>{selectedPlayer.team || '-'}</strong>
+            </article>
+            <article>
+              <span>Camada</span>
+              <strong>{selectedPlayer.cohort || '-'}</strong>
+            </article>
+            <article>
+              <span>Edad</span>
+              <strong>{selectedPlayer.age || '-'}</strong>
+            </article>
+            <article>
+              <span>Asistencia</span>
+              <strong>{selectedPlayer.status}</strong>
+            </article>
+            <article>
+              <span>Ranking</span>
+              <strong>{calculateRankingScore(selectedPlayer)} pts</strong>
+            </article>
+          </div>
+
+          <div className="player-profile-note">
+            {selectedPlayer.perfectAttendance30Days ? (
+              <span className="medal-badge">🏅 Medalla por asistencia perfecta 30 días</span>
+            ) : (
+              <span className="muted-badge">Sin medalla de 30 días</span>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section className="ranking-panel" id="ranking" aria-labelledby="ranking-title">
         <div className="section-heading">
