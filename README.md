@@ -22,6 +22,7 @@ App de asistencia a entrenamientos deportivos multi-deporte.
 - Selector de idioma con Español primero y mas de 10 opciones disponibles.
 - Ojo para ver/ocultar clave, opción de recordar clave en el navegador y deporte fijo persistente.
 - Lista de 30 deportes practicados en Argentina, primero deportes de equipo y luego individuales.
+- Importacion masiva de jugadores desde planilla Excel/CSV y extraccion de datos desde foto de ficha (staff y coordinacion).
 - Indicadores principales de deportistas, equipos y asistencia.
 
 ## Configurar login con Google

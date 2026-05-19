@@ -1,5 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+import {
+  downloadPlayerImportTemplate,
+  parseSpreadsheetFile,
+  recognizePlayerFromImage,
+  type PlayerImportData,
+} from './playerImport';
 
 type AttendanceStatus = 'Presente' | 'Ausente';
 type AttendanceActivity = 'Entrenamiento' | 'Partido';
@@ -268,6 +274,77 @@ function numberFromForm(value: string) {
   const parsedValue = Number(value);
 
   return Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
+}
+
+function athleteFromImportData(data: PlayerImportData, id: number): Athlete {
+  return {
+    id,
+    memberNumber: data.memberNumber.trim(),
+    lastName: data.lastName.trim().toUpperCase(),
+    firstName: data.firstName.trim().toUpperCase(),
+    dni: data.dni.trim(),
+    address: data.address.trim(),
+    birthDate: data.birthDate.trim(),
+    age: data.age.trim(),
+    playerPhone: data.playerPhone.trim(),
+    fatherPhone: data.fatherPhone.trim(),
+    motherPhone: data.motherPhone.trim(),
+    email: data.email.trim(),
+    healthInsurance: data.healthInsurance.trim(),
+    healthInsuranceNumber: data.healthInsuranceNumber.trim(),
+    paymentMethod: data.paymentMethod.trim(),
+    memberStatus: data.memberStatus,
+    membershipType: data.membershipType.trim(),
+    nextBillingDate: data.nextBillingDate.trim(),
+    sport: data.sport.trim(),
+    team: data.team.trim(),
+    cohort: data.cohort.trim(),
+    perfectAttendance30Days: data.perfectAttendance30Days,
+    trainingsAttended: data.trainingsAttended,
+    trainingsTotal: data.trainingsTotal,
+    matchesAttended: data.matchesAttended,
+    matchesTotal: data.matchesTotal,
+    toursAttended: data.toursAttended,
+    toursTotal: data.toursTotal,
+    stayedAsGuest: data.stayedAsGuest,
+    hostedGuest: data.hostedGuest,
+    status: data.status,
+  };
+}
+
+function importDataToFormState(data: PlayerImportData, preferredSport: string) {
+  return {
+    memberNumber: data.memberNumber,
+    lastName: data.lastName,
+    firstName: data.firstName,
+    dni: data.dni,
+    address: data.address,
+    birthDate: data.birthDate,
+    age: data.age,
+    playerPhone: data.playerPhone,
+    fatherPhone: data.fatherPhone,
+    motherPhone: data.motherPhone,
+    email: data.email,
+    healthInsurance: data.healthInsurance,
+    healthInsuranceNumber: data.healthInsuranceNumber,
+    paymentMethod: data.paymentMethod,
+    memberStatus: data.memberStatus,
+    membershipType: data.membershipType,
+    nextBillingDate: data.nextBillingDate,
+    sport: data.sport || preferredSport,
+    team: data.team,
+    cohort: data.cohort,
+    perfectAttendance30Days: data.perfectAttendance30Days,
+    trainingsAttended: String(data.trainingsAttended),
+    trainingsTotal: String(data.trainingsTotal),
+    matchesAttended: String(data.matchesAttended),
+    matchesTotal: String(data.matchesTotal),
+    toursAttended: String(data.toursAttended),
+    toursTotal: String(data.toursTotal),
+    stayedAsGuest: data.stayedAsGuest,
+    hostedGuest: data.hostedGuest,
+    status: data.status,
+  };
 }
 
 function readStoredValue(key: string) {
@@ -767,6 +844,13 @@ function App({ googleClientIdConfigured }: AppProps) {
     status: 'Presente' as AttendanceStatus,
   });
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const spreadsheetInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [attendanceActivity, setAttendanceActivity] =
     useState<AttendanceActivity>('Entrenamiento');
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Semanal');
@@ -775,6 +859,7 @@ function App({ googleClientIdConfigured }: AppProps) {
   const [reportTarget, setReportTarget] = useState(reportGroupsByScope.General[0]);
   const presentCount = athleteList.filter((athlete) => athlete.status === 'Presente').length;
   const isPrivilegedUser = userRole === 'Staff' || userRole === 'Coordinación' || userRole === 'Master';
+  const canImportPlayers = userRole === 'Staff' || userRole === 'Coordinación';
   const isMasterUser = userRole === 'Master';
   const selectedPlayer = athleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
   const attendancePercentage = Math.round((presentCount / athleteList.length) * 100);
@@ -999,6 +1084,133 @@ function App({ googleClientIdConfigured }: AppProps) {
     setSaveMessage(
       `${trimmedLastName.toUpperCase()} ${trimmedFirstName.toUpperCase()} fue cargado correctamente.`,
     );
+  };
+
+  const addImportedPlayers = (players: PlayerImportData[]) => {
+    const baseId = Date.now();
+
+    setAthleteList((currentAthletes) => [
+      ...players.map((player, index) => athleteFromImportData(player, baseId + index)),
+      ...currentAthletes,
+    ]);
+  };
+
+  const clearPhotoSelection = () => {
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl);
+    }
+
+    setPhotoPreviewUrl(null);
+    setPhotoFile(null);
+
+    if (photoInputRef.current) {
+      photoInputRef.current.value = '';
+    }
+  };
+
+  const handleSpreadsheetImport = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setImportLoading(true);
+    setImportMessage(null);
+
+    try {
+      const { players, skipped } = await parseSpreadsheetFile(
+        file,
+        preferredSport,
+        sportOptions,
+      );
+
+      if (players.length === 0) {
+        setImportMessage(
+          'No se encontraron filas válidas. Descargá la plantilla y completá apellido, nombre y DNI.',
+        );
+        return;
+      }
+
+      addImportedPlayers(players);
+      setImportMessage(
+        `Se importaron ${players.length} jugador(es).${
+          skipped > 0 ? ` ${skipped} fila(s) se omitieron por datos incompletos.` : ''
+        }`,
+      );
+      setSaveMessage(null);
+    } catch {
+      setImportMessage(
+        'No se pudo leer la planilla. Verificá que sea Excel (.xlsx, .xls) o CSV compatible.',
+      );
+    } finally {
+      setImportLoading(false);
+      event.target.value = '';
+    }
+  };
+
+  const handlePhotoSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl);
+    }
+
+    setPhotoFile(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+    setImportMessage(null);
+  };
+
+  const handlePhotoImport = async () => {
+    if (!photoFile) {
+      setImportMessage('Seleccioná una foto de la ficha antes de extraer los datos.');
+      return;
+    }
+
+    setImportLoading(true);
+    setImportProgress(0);
+    setImportMessage(null);
+
+    try {
+      const extracted = await recognizePlayerFromImage(
+        photoFile,
+        preferredSport,
+        setImportProgress,
+      );
+
+      if (
+        !extracted.lastName.trim() ||
+        !extracted.firstName.trim() ||
+        !extracted.dni.trim()
+      ) {
+        setNewAthlete((current) => ({
+          ...current,
+          ...importDataToFormState(extracted, preferredSport),
+        }));
+        setImportMessage(
+          'Extracción parcial desde la foto: revisá y completá los campos antes de guardar.',
+        );
+        return;
+      }
+
+      addImportedPlayers([extracted]);
+      setImportMessage(
+        `Jugador ${extracted.lastName.toUpperCase()} ${extracted.firstName.toUpperCase()} importado desde la foto.`,
+      );
+      clearPhotoSelection();
+      setSaveMessage(null);
+    } catch {
+      setImportMessage(
+        'No se pudo leer la foto. Usá buena luz, encuadre la ficha completa e intentá de nuevo.',
+      );
+    } finally {
+      setImportLoading(false);
+      setImportProgress(0);
+    }
   };
 
   const exportAthletesToExcel = () => {
@@ -1691,10 +1903,97 @@ function App({ googleClientIdConfigured }: AppProps) {
           <p className="eyebrow">Carga de datos</p>
           <h2 id="data-entry-title">Registrar ficha de jugadores</h2>
           <p>
-            Carga apellido, nombre, DNI, obra social y datos de socio por separado para
-            exportarlos a Excel con columnas independientes.
+            Carga apellido, nombre, DNI, obra social y datos de socio por separado, importá una
+            planilla Excel o extraé datos desde una foto de la ficha.
           </p>
         </div>
+
+        {canImportPlayers ? (
+          <div className="import-panel" aria-labelledby="import-panel-title">
+            <div className="section-heading compact">
+              <h3 id="import-panel-title">Importar jugadores</h3>
+              <p>
+                Disponible para staff y coordinación: subí una planilla (.xlsx, .xls o CSV) o una
+                foto de la ficha para completar los datos automáticamente.
+              </p>
+            </div>
+
+            <div className="import-actions">
+              <article className="import-card">
+                <strong>Planilla Excel</strong>
+                <p>Usá la misma estructura de columnas que la exportación de Sportia.</p>
+                <div className="import-buttons">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={downloadPlayerImportTemplate}
+                  >
+                    Descargar plantilla
+                  </button>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={importLoading}
+                    onClick={() => spreadsheetInputRef.current?.click()}
+                  >
+                    {importLoading ? 'Procesando...' : 'Subir planilla'}
+                  </button>
+                </div>
+                <input
+                  ref={spreadsheetInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                  hidden
+                  onChange={handleSpreadsheetImport}
+                />
+              </article>
+
+              <article className="import-card">
+                <strong>Foto de ficha</strong>
+                <p>
+                  Sacá o subí una foto del formulario impreso. El sistema lee el texto y completa
+                  apellido, DNI, teléfonos y obra social cuando los detecta.
+                </p>
+                <div className="import-buttons">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={importLoading}
+                    onClick={() => photoInputRef.current?.click()}
+                  >
+                    Elegir foto
+                  </button>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={importLoading || !photoFile}
+                    onClick={handlePhotoImport}
+                  >
+                    {importLoading && photoFile
+                      ? `Leyendo foto ${importProgress}%`
+                      : 'Extraer datos de foto'}
+                  </button>
+                </div>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  hidden
+                  onChange={handlePhotoSelect}
+                />
+                {photoPreviewUrl ? (
+                  <figure className="import-photo-preview">
+                    <img src={photoPreviewUrl} alt="Vista previa de la ficha cargada" />
+                    <figcaption>Vista previa de la ficha</figcaption>
+                  </figure>
+                ) : null}
+              </article>
+            </div>
+
+            {importMessage ? <p className="import-message">{importMessage}</p> : null}
+          </div>
+        ) : null}
 
         <form className="data-form data-form-expanded" onSubmit={handleAthleteSubmit}>
           <label>
