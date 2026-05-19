@@ -1,11 +1,11 @@
-# Sportia
+# Sportia list
 
 App de asistencia a entrenamientos deportivos multi-deporte.
 
 ## Primer alcance
 
 - Login con Google configurable por entorno.
-- Landing inicial para presentar Sportia.
+- Landing inicial para presentar Sportia list.
 - Resumen de asistencia de un entrenamiento.
 - Modulo de carga de jugadores con apellido, nombre, DNI, obra social, celulares de jugador/padre/madre y datos de socio separados.
 - Exportacion a Excel/CSV con una columna por cada item de la ficha.
@@ -36,7 +36,7 @@ VITE_GOOGLE_CLIENT_ID=tu-client-id-de-google.apps.googleusercontent.com
 ```
 
 Para desarrollo local agrega `http://localhost:5173` como origen autorizado en Google.
-Sin esa variable, Sportia muestra el acceso en modo demo.
+Sin esa variable, Sportia list muestra el acceso en modo demo.
 
 ## Configurar publicidad de Google (AdSense)
 
@@ -53,7 +53,7 @@ VITE_GOOGLE_ADSENSE_SLOT_FOOTER=1234567892
 
 4. Opcional: `VITE_GOOGLE_ADSENSE_TEST=true` muestra anuncios de prueba mientras desarrollás.
 
-Los tres espacios de Sportia (home/ranking, paneles internos y pie de página) cargan el script de AdSense cuando el publisher ID y el slot correspondiente están configurados. Sin esas variables se muestra el marcador de espacio publicitario en modo demo. El rol **Master** ve en su panel el estado de cada unidad (activa, pendiente o sin configurar).
+Los tres espacios de Sportia list (home/ranking, paneles internos y pie de página) cargan el script de AdSense cuando el publisher ID y el slot correspondiente están configurados. Sin esas variables se muestra el marcador de espacio publicitario en modo demo. El rol **Master** ve en su panel el estado de cada unidad (activa, pendiente o sin configurar).
 
 ## Desarrollo
 

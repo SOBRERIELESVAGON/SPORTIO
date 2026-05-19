@@ -354,7 +354,7 @@ export function downloadPlayerImportTemplate() {
   const link = document.createElement('a');
 
   link.href = url;
-  link.download = 'plantilla-jugadores-sportia.csv';
+  link.download = 'plantilla-jugadores-sportia-list.csv';
   link.click();
   URL.revokeObjectURL(url);
 }

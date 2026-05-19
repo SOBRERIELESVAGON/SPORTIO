@@ -8,7 +8,7 @@ import './styles.css';
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
-  throw new Error('No se encontro el contenedor principal de Sportia.');
+  throw new Error('No se encontro el contenedor principal de Sportia list.');
 }
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;

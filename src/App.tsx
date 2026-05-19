@@ -836,7 +836,7 @@ function LoginScreen({
       <section className="login-hero">
         <a className="brand" href="#inicio" aria-label={t('common.brandHome')}>
           <span className="brand-mark">S</span>
-          <span>Sportia</span>
+          <span>{t('common.brandName')}</span>
         </a>
         <p className="eyebrow">{t('login.roleAccess')}</p>
         <h1>{t('login.heroTitle')}</h1>
@@ -1554,7 +1554,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     const link = document.createElement('a');
 
     link.href = url;
-    link.download = 'jugadores-sportia.csv';
+    link.download = 'jugadores-sportia-list.csv';
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -1696,7 +1696,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       <nav className="topbar" aria-label={t('nav.main')}>
         <a className="brand" href="#inicio" aria-label={t('common.brandHome')}>
           <span className="brand-mark">S</span>
-          <span>Sportia</span>
+          <span>{t('common.brandName')}</span>
         </a>
         <div className="nav-links">
           {isPrivilegedUser ? <a href="#control-asistencia">{t('nav.attendance')}</a> : null}
