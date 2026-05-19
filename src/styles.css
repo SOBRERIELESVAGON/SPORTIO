@@ -66,23 +66,25 @@ button {
 .login-hero .brand.brand-login {
   position: absolute;
   top: 46px;
-  gap: 15px;
-  font-size: 1.65rem;
+  gap: 30px;
+  font-size: 3.3rem;
 }
 
 .login-hero .brand.brand-login .brand-mark {
-  width: 57px;
-  height: 57px;
-  border-radius: 18px;
-  font-size: 1.35rem;
+  width: 114px;
+  height: 114px;
+  border-radius: 36px;
+  font-size: 2.7rem;
 }
 
 .login-hero-tagline {
-  max-width: 620px;
-  margin: 0;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 1.25rem;
-  line-height: 1.65;
+  max-width: 90%;
+  margin: 0 0 3cm;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 3.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
 }
 
 .login-card {
@@ -1587,16 +1589,21 @@ button {
 
   .login-hero .brand.brand-login {
     top: 30px;
-    font-size: 1.45rem;
+    gap: 20px;
+    font-size: 2.6rem;
   }
 
   .login-hero .brand.brand-login .brand-mark {
-    width: 50px;
-    height: 50px;
+    width: 88px;
+    height: 88px;
+    border-radius: 28px;
+    font-size: 2.1rem;
   }
 
   .login-hero-tagline {
-    font-size: 1.1rem;
+    margin-bottom: 3cm;
+    font-size: 2.85rem;
+    line-height: 1.3;
   }
 
   .topbar {
