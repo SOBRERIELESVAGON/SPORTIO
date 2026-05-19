@@ -36,10 +36,29 @@ type AppProps = {
   googleClientIdConfigured: boolean;
 };
 
+const sportOptions = [
+  'Fútbol',
+  'Rugby',
+  'Baloncesto',
+  'Voleibol',
+  'Hockey sobre césped',
+  'Cricket',
+  'Otro',
+  'Hockey sobre hielo',
+  'Waterpolo',
+  'Ultimate frisbee',
+  'Beisbol',
+  'Softbol',
+  'Fútbol americano',
+  'Polo',
+  'Futsal',
+  'Lacrosse',
+];
+
 const initialAthletes: Athlete[] = [
-  { id: 1, name: 'Lucia Mendez', sport: 'Futbol', status: 'Presente' },
-  { id: 2, name: 'Mateo Rojas', sport: 'Basquet', status: 'Tarde' },
-  { id: 3, name: 'Sofia Arias', sport: 'Voley', status: 'Presente' },
+  { id: 1, name: 'Lucia Mendez', sport: 'Fútbol', status: 'Presente' },
+  { id: 2, name: 'Mateo Rojas', sport: 'Baloncesto', status: 'Tarde' },
+  { id: 3, name: 'Sofia Arias', sport: 'Voleibol', status: 'Presente' },
   { id: 4, name: 'Tomas Silva', sport: 'Rugby', status: 'Ausente' },
 ];
 
@@ -184,7 +203,7 @@ function App({ googleClientIdConfigured }: AppProps) {
   const [athleteList, setAthleteList] = useState<Athlete[]>(initialAthletes);
   const [newAthlete, setNewAthlete] = useState({
     name: '',
-    sport: 'Futbol',
+    sport: sportOptions[0],
     status: 'Presente' as AttendanceStatus,
   });
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -236,7 +255,7 @@ function App({ googleClientIdConfigured }: AppProps) {
     };
 
     setAthleteList((currentAthletes) => [athlete, ...currentAthletes]);
-    setNewAthlete({ name: '', sport: 'Futbol', status: 'Presente' });
+    setNewAthlete({ name: '', sport: sportOptions[0], status: 'Presente' });
     setSaveMessage(`${trimmedName} fue cargado correctamente.`);
   };
 
@@ -354,15 +373,19 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
-            Deporte o equipo
-            <input
-              type="text"
+            Deporte
+            <select
               value={newAthlete.sport}
               onChange={(event) =>
                 setNewAthlete((current) => ({ ...current, sport: event.target.value }))
               }
-              placeholder="Ej: Futbol Sub 16"
-            />
+            >
+              {sportOptions.map((sport) => (
+                <option value={sport} key={sport}>
+                  {sport}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label>
