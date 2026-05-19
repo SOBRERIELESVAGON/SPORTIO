@@ -41,7 +41,7 @@
   "auth.wrongPassword": "Falscher Schlüssel für die ausgewählte Rolle.",
   "auth.googleError": "Google konnte sich nicht anmelden.Versuchen Sie es erneut.",
   "auth.playerNotFound": "Wir können die Datei des ausgewählten Players nicht finden.",
-  "role.staff": "Personal",
+  "role.staff": "Trainer/Manager",
   "role.coordination": "Koordinierung",
   "role.master": "Master",
   "role.player": "Spieler",

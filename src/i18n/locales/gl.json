@@ -41,7 +41,7 @@
   "auth.wrongPassword": "Chave incorrecta para o rol seleccionado.",
   "auth.googleError": "Google non puido iniciar sesión.Téntao de novo.",
   "auth.playerNotFound": "Non podemos atopar o ficheiro do reprodutor seleccionado.",
-  "role.staff": "Persoal",
+  "role.staff": "Adestrador/Manager",
   "role.coordination": "Coordinación",
   "role.master": "Mestre",
   "role.player": "Xogador",

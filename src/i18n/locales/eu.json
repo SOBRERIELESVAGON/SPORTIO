@@ -41,7 +41,7 @@
   "auth.wrongPassword": "Hautatutako rolaren gako okerra.",
   "auth.googleError": "Google-k ezin izan du saioa hasi.Saiatu berriro.",
   "auth.playerNotFound": "Ezin dugu hautatutako jokalariaren fitxategia aurkitu.",
-  "role.staff": "Langileak",
+  "role.staff": "Entrenatzailea/Manager",
   "role.coordination": "Koordinazioa",
   "role.master": "Maisua",
   "role.player": "Jokalari",

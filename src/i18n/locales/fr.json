@@ -41,7 +41,7 @@
   "auth.wrongPassword": "Clé incorrecte pour le rôle sélectionné.",
   "auth.googleError": "Google n'a pas pu se connecter.Réessayez.",
   "auth.playerNotFound": "Nous ne trouvons pas le fichier du lecteur sélectionné.",
-  "role.staff": "Personnel",
+  "role.staff": "Entraîneur/Manager",
   "role.coordination": "Coordination",
   "role.master": "Maître",
   "role.player": "Joueur",

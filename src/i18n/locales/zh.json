@@ -41,7 +41,7 @@
   "auth.wrongPassword": "所选角色的密钥不正确。",
   "auth.googleError": "Google 无法登录。请重试。",
   "auth.playerNotFound": "我们找不到所选播放器的文件。",
-  "role.staff": "职员",
+  "role.staff": "教练/经理",
   "role.coordination": "协调",
   "role.master": "掌握",
   "role.player": "玩家",

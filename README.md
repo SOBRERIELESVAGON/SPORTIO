@@ -16,7 +16,7 @@ App de asistencia a entrenamientos deportivos multi-deporte.
 - Reportes de asistencia con ejemplo diario, semanal, mensual, bimestral, trimestral, semestral y anual.
 - Vista de reportes por deporte, individual y general por division, equipo o camada.
 - Control de vista por rol: usuarios ven ranking; staff y coordinacion ven carga/reportes internos.
-- Staff y coordinacion ingresan con clave; jugadores ingresan sin clave y solo ven su ficha individual y el ranking.
+- Entrenador/Manager y coordinacion ingresan con clave; jugadores ingresan sin clave y solo ven su ficha individual y el ranking.
 - Rol Master con clave para ver todo, estadísticas globales y reportes de usuarios.
 - Modelo gratuito para clubes, entrenadores, staff, jugadores y coordinacion, monetizado con espacios publicitarios administrables.
 - Selector de idioma con Español primero y mas de 10 opciones; al cambiar idioma se traducen titulos, menus, formularios y mensajes de toda la interfaz.

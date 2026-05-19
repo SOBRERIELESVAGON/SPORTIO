@@ -41,7 +41,7 @@
   "auth.wrongPassword": "Onjuiste sleutel voor de geselecteerde rol.",
   "auth.googleError": "Google kan niet inloggen.Probeer het opnieuw.",
   "auth.playerNotFound": "We kunnen het bestand van de geselecteerde speler niet vinden.",
-  "role.staff": "Personeel",
+  "role.staff": "Trainer/Manager",
   "role.coordination": "Coördinatie",
   "role.master": "Meester",
   "role.player": "Speler",
