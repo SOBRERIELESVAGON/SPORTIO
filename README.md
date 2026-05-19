@@ -17,6 +17,7 @@ App de asistencia a entrenamientos deportivos multi-deporte.
 - Vista de reportes por deporte, individual y general por division, equipo o camada.
 - Control de vista por rol: usuarios ven ranking; staff y coordinacion ven carga/reportes internos.
 - Staff y coordinacion ingresan con clave; jugadores ingresan sin clave y solo ven su ficha individual y el ranking.
+- Selector de idioma con Español primero y mas de 10 opciones disponibles.
 - Indicadores principales de deportistas, equipos y asistencia.
 
 ## Configurar login con Google

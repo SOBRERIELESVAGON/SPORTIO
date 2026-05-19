@@ -5,6 +5,18 @@ type AttendanceStatus = 'Presente' | 'Ausente';
 type AttendanceActivity = 'Entrenamiento' | 'Partido';
 type UserRole = 'Jugador' | 'Staff' | 'Coordinación';
 type StaffRole = Exclude<UserRole, 'Jugador'>;
+type LanguageCode =
+  | 'es'
+  | 'en'
+  | 'pt'
+  | 'fr'
+  | 'it'
+  | 'de'
+  | 'nl'
+  | 'ca'
+  | 'gl'
+  | 'eu'
+  | 'zh';
 type ReportPeriod =
   | 'Diario'
   | 'Semanal'
@@ -87,6 +99,19 @@ const sportOptions = [
 ];
 
 const allSportsReportOption = 'Todos los deportes';
+const languageOptions: { code: LanguageCode; label: string }[] = [
+  { code: 'es', label: 'Español' },
+  { code: 'en', label: 'English' },
+  { code: 'pt', label: 'Português' },
+  { code: 'fr', label: 'Français' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'nl', label: 'Nederlands' },
+  { code: 'ca', label: 'Català' },
+  { code: 'gl', label: 'Galego' },
+  { code: 'eu', label: 'Euskera' },
+  { code: 'zh', label: '中文' },
+];
 const staffRoles: StaffRole[] = ['Staff', 'Coordinación'];
 const staffPasswords: Record<StaffRole, string> = {
   Staff: 'staff2026',
@@ -204,6 +229,30 @@ function numberFromForm(value: string) {
   const parsedValue = Number(value);
 
   return Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
+}
+
+function LanguageSelector({
+  selectedLanguage,
+  onLanguageChange,
+}: {
+  selectedLanguage: LanguageCode;
+  onLanguageChange: (language: LanguageCode) => void;
+}) {
+  return (
+    <label className="language-selector">
+      Idioma
+      <select
+        value={selectedLanguage}
+        onChange={(event) => onLanguageChange(event.target.value as LanguageCode)}
+      >
+        {languageOptions.map((language) => (
+          <option value={language.code} key={language.code}>
+            {language.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 const initialAthletes: Athlete[] = [
@@ -389,6 +438,8 @@ function LoginScreen({
   onPlayerAccess,
   onStaffAccess,
   onGoogleError,
+  onLanguageChange,
+  selectedLanguage,
 }: {
   error: string | null;
   athletes: Athlete[];
@@ -396,6 +447,8 @@ function LoginScreen({
   onPlayerAccess: (athleteId: number) => void;
   onStaffAccess: (role: StaffRole, password: string) => void;
   onGoogleError: () => void;
+  onLanguageChange: (language: LanguageCode) => void;
+  selectedLanguage: LanguageCode;
 }) {
   const [staffRole, setStaffRole] = useState<StaffRole>('Staff');
   const [staffPassword, setStaffPassword] = useState('');
@@ -434,6 +487,13 @@ function LoginScreen({
       </section>
 
       <section className="login-card" aria-labelledby="login-title">
+        <div className="login-language-row">
+          <LanguageSelector
+            selectedLanguage={selectedLanguage}
+            onLanguageChange={onLanguageChange}
+          />
+        </div>
+
         <div>
           <p className="eyebrow">Login</p>
           <h2 id="login-title">Elegí cómo entrar</h2>
@@ -535,6 +595,7 @@ function LoginScreen({
 
 function App({ googleClientIdConfigured }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('es');
   const [userRole, setUserRole] = useState<UserRole>('Jugador');
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -963,8 +1024,10 @@ function App({ googleClientIdConfigured }: AppProps) {
         athletes={athleteList}
         googleClientIdConfigured={googleClientIdConfigured}
         onGoogleError={() => setAuthError('Google no pudo iniciar sesion. Intentalo otra vez.')}
+        onLanguageChange={setSelectedLanguage}
         onPlayerAccess={handlePlayerAccess}
         onStaffAccess={handleStaffAccess}
+        selectedLanguage={selectedLanguage}
       />
     );
   }
@@ -985,6 +1048,10 @@ function App({ googleClientIdConfigured }: AppProps) {
           {isPrivilegedUser ? <a href="#equipos">Equipos</a> : null}
         </div>
         <div className="user-menu">
+          <LanguageSelector
+            selectedLanguage={selectedLanguage}
+            onLanguageChange={setSelectedLanguage}
+          />
           {user.picture ? (
             <img className="user-avatar" src={user.picture} alt="" referrerPolicy="no-referrer" />
           ) : (
