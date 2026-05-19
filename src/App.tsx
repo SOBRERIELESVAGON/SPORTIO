@@ -3,8 +3,8 @@ import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
 type AttendanceStatus = 'Presente' | 'Ausente';
 type AttendanceActivity = 'Entrenamiento' | 'Partido';
-type UserRole = 'Jugador' | 'Staff' | 'Coordinación';
-type StaffRole = Exclude<UserRole, 'Jugador'>;
+type UserRole = 'Jugador' | 'Staff' | 'Coordinación' | 'Master';
+type ProtectedRole = Exclude<UserRole, 'Jugador'>;
 type LanguageCode =
   | 'es'
   | 'en'
@@ -112,12 +112,34 @@ const languageOptions: { code: LanguageCode; label: string }[] = [
   { code: 'eu', label: 'Euskera' },
   { code: 'zh', label: '中文' },
 ];
-const staffRoles: StaffRole[] = ['Staff', 'Coordinación'];
-const staffPasswords: Record<StaffRole, string> = {
+const protectedRoles: ProtectedRole[] = ['Staff', 'Coordinación', 'Master'];
+const rolePasswords: Record<ProtectedRole, string> = {
   Staff: 'staff2026',
   Coordinación: 'coord2026',
+  Master: 'master2026',
 };
 const rankingScopes = ['Camada', 'Edad', 'Equipo'] as const;
+
+const adSlots = [
+  {
+    id: 'hero-ad',
+    title: 'Publicidad principal',
+    placement: 'Home / Ranking',
+    size: '970 x 250',
+  },
+  {
+    id: 'sidebar-ad',
+    title: 'Publicidad lateral',
+    placement: 'Paneles internos',
+    size: '300 x 250',
+  },
+  {
+    id: 'footer-ad',
+    title: 'Publicidad inferior',
+    placement: 'Todas las vistas',
+    size: '728 x 90',
+  },
+];
 
 const reportPeriods: ReportPeriod[] = [
   'Diario',
@@ -252,6 +274,17 @@ function LanguageSelector({
         ))}
       </select>
     </label>
+  );
+}
+
+function AdSlot({ title, placement, size }: { title: string; placement: string; size: string }) {
+  return (
+    <aside className="ad-slot" aria-label={title}>
+      <span>Espacio publicitario</span>
+      <strong>{title}</strong>
+      <p>{placement}</p>
+      <small>{size} · Administrado por el dueño de Sportia</small>
+    </aside>
   );
 }
 
@@ -445,12 +478,12 @@ function LoginScreen({
   athletes: Athlete[];
   googleClientIdConfigured: boolean;
   onPlayerAccess: (athleteId: number) => void;
-  onStaffAccess: (role: StaffRole, password: string) => void;
+  onStaffAccess: (role: ProtectedRole, password: string) => void;
   onGoogleError: () => void;
   onLanguageChange: (language: LanguageCode) => void;
   selectedLanguage: LanguageCode;
 }) {
-  const [staffRole, setStaffRole] = useState<StaffRole>('Staff');
+  const [staffRole, setStaffRole] = useState<ProtectedRole>('Staff');
   const [staffPassword, setStaffPassword] = useState('');
   const [selectedAthleteId, setSelectedAthleteId] = useState(athletes[0]?.id ?? 0);
   const [googleIdentity, setGoogleIdentity] = useState<string | null>(null);
@@ -479,10 +512,10 @@ function LoginScreen({
           <span>Sportia</span>
         </a>
         <p className="eyebrow">Acceso por rol</p>
-        <h1>Staff con clave, jugadores con ficha propia.</h1>
+        <h1>Usuarios gratis, publicidad gestionada por vos.</h1>
         <p>
-          Staff y Coordinación administran datos con clave. Los jugadores entran sin clave para
-          ver solo su ficha individual y el ranking.
+          Clubes, entrenadores, staff, jugadores y coordinación usan Sportia gratis. El ingreso
+          Master permite ver todo y administrar el modelo con espacios publicitarios.
         </p>
       </section>
 
@@ -499,7 +532,7 @@ function LoginScreen({
           <h2 id="login-title">Elegí cómo entrar</h2>
           <p>
             Las claves de demo son <strong>staff2026</strong> para Staff y{' '}
-            <strong>coord2026</strong> para Coordinación.
+            <strong>coord2026</strong> para Coordinación. Master usa <strong>master2026</strong>.
           </p>
         </div>
 
@@ -508,9 +541,9 @@ function LoginScreen({
             Rol con clave
             <select
               value={staffRole}
-              onChange={(event) => setStaffRole(event.target.value as StaffRole)}
+              onChange={(event) => setStaffRole(event.target.value as ProtectedRole)}
             >
-              {staffRoles.map((role) => (
+              {protectedRoles.map((role) => (
                 <option value={role} key={role}>
                   {role}
                 </option>
@@ -640,7 +673,8 @@ function App({ googleClientIdConfigured }: AppProps) {
   const [reportScope, setReportScope] = useState<ReportScope>('General');
   const [reportTarget, setReportTarget] = useState(reportGroupsByScope.General[0]);
   const presentCount = athleteList.filter((athlete) => athlete.status === 'Presente').length;
-  const isPrivilegedUser = userRole === 'Staff' || userRole === 'Coordinación';
+  const isPrivilegedUser = userRole === 'Staff' || userRole === 'Coordinación' || userRole === 'Master';
+  const isMasterUser = userRole === 'Master';
   const selectedPlayer = athleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
   const attendancePercentage = Math.round((presentCount / athleteList.length) * 100);
   const perfectAttendanceCount = athleteList.filter(
@@ -715,9 +749,26 @@ function App({ googleClientIdConfigured }: AppProps) {
     { label: 'Asistencia de hoy', value: `${attendancePercentage}%` },
     { label: 'Medallas 30 días', value: String(perfectAttendanceCount) },
   ];
+  const activePlayersCount = athleteList.filter((athlete) => athlete.memberStatus === 'Activo').length;
+  const totalTeamsCount = new Set(athleteList.map((athlete) => athlete.team).filter(Boolean)).size;
+  const totalCohortsCount = new Set(athleteList.map((athlete) => athlete.cohort).filter(Boolean)).size;
+  const averageRankingScore = Math.round(
+    athleteList.reduce((total, athlete) => total + calculateRankingScore(athlete), 0) /
+      athleteList.length,
+  );
+  const masterStats = [
+    { label: 'Jugadores totales', value: String(athleteList.length) },
+    { label: 'Jugadores activos', value: String(activePlayersCount) },
+    { label: 'Equipos registrados', value: String(totalTeamsCount) },
+    { label: 'Camadas registradas', value: String(totalCohortsCount) },
+    { label: 'Staff demo', value: '2' },
+    { label: 'Coordinación demo', value: '1' },
+    { label: 'Clubes demo', value: '1' },
+    { label: 'Promedio ranking', value: `${averageRankingScore} pts` },
+  ];
 
-  const handleStaffAccess = (role: StaffRole, password: string) => {
-    if (staffPasswords[role] !== password) {
+  const handleStaffAccess = (role: ProtectedRole, password: string) => {
+    if (rolePasswords[role] !== password) {
       setAuthError('Clave incorrecta para el rol seleccionado.');
       return;
     }
@@ -1044,6 +1095,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           {isPrivilegedUser ? <a href="#carga-datos">Carga</a> : null}
           {userRole === 'Jugador' ? <a href="#mi-ficha">Mi ficha</a> : null}
           <a href="#ranking">Ranking</a>
+          {isMasterUser ? <a href="#master-panel">Master</a> : null}
           {isPrivilegedUser ? <a href="#reportes">Reportes</a> : null}
           {isPrivilegedUser ? <a href="#equipos">Equipos</a> : null}
         </div>
@@ -1078,10 +1130,10 @@ function App({ googleClientIdConfigured }: AppProps) {
       <section className="hero" id="inicio">
         <div className="hero-copy">
           <p className="eyebrow">Gestion deportiva multi-deporte</p>
-          <h1>Controla asistencia, equipos y entrenamientos desde un solo lugar.</h1>
+          <h1>Controla asistencia, equipos y entrenamientos sin cobrarle a los usuarios.</h1>
           <p className="hero-description">
-            Sportia ayuda a entrenadores y clubes a saber quien entreno, que sesiones vienen y
-            como evoluciona la participacion de cada equipo.
+            Sportia es gratis para clubes, entrenadores, staff, jugadores y coordinación. La
+            monetización queda en espacios de publicidad administrados por vos.
           </p>
           <div className="hero-actions">
             <a className="primary-button" href="#ranking">
@@ -1138,6 +1190,17 @@ function App({ googleClientIdConfigured }: AppProps) {
         )}
       </section>
 
+      <section className="free-access-banner" aria-label="Modelo gratis con publicidad">
+        <div>
+          <p className="eyebrow">Modelo gratuito</p>
+          <h2>Clubes, entrenadores, staff, jugadores y coordinación no pagan.</h2>
+          <p>Los ingresos se generan con espacios publicitarios propios dentro de Sportia.</p>
+        </div>
+        <span>Publicidad administrada por el dueño</span>
+      </section>
+
+      <AdSlot {...adSlots[0]} />
+
       {isPrivilegedUser ? (
         <section className="metrics-grid" aria-label="Metricas principales">
           {metrics.map((metric) => (
@@ -1146,6 +1209,96 @@ function App({ googleClientIdConfigured }: AppProps) {
               <strong>{metric.value}</strong>
             </article>
           ))}
+        </section>
+      ) : null}
+
+      {isMasterUser ? (
+        <section className="master-panel" id="master-panel" aria-labelledby="master-panel-title">
+          <div className="section-heading">
+            <p className="eyebrow">Master</p>
+            <h2 id="master-panel-title">Panel de control global</h2>
+            <p>
+              El rol Master ve todo lo que hacen Staff, Coordinación y jugadores. Este panel reúne
+              estadísticas, reportes de usuarios y espacios de publicidad.
+            </p>
+          </div>
+
+          <div className="master-stats-grid">
+            {masterStats.map((stat) => (
+              <article key={stat.label}>
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+              </article>
+            ))}
+          </div>
+
+          <div className="master-grid">
+            <article className="master-card">
+              <div className="section-heading compact">
+                <p className="eyebrow">Usuarios</p>
+                <h3>Reporte por tipo</h3>
+              </div>
+              <div className="user-report-list">
+                <div>
+                  <span>Clubes</span>
+                  <strong>1</strong>
+                  <small>Gratis</small>
+                </div>
+                <div>
+                  <span>Entrenadores</span>
+                  <strong>2</strong>
+                  <small>Gratis</small>
+                </div>
+                <div>
+                  <span>Staff</span>
+                  <strong>2</strong>
+                  <small>Gratis</small>
+                </div>
+                <div>
+                  <span>Coordinación</span>
+                  <strong>1</strong>
+                  <small>Gratis</small>
+                </div>
+                <div>
+                  <span>Jugadores</span>
+                  <strong>{athleteList.length}</strong>
+                  <small>Gratis</small>
+                </div>
+              </div>
+            </article>
+
+            <article className="master-card">
+              <div className="section-heading compact">
+                <p className="eyebrow">Publicidad</p>
+                <h3>Inventario disponible</h3>
+              </div>
+              <div className="ad-management-list">
+                {adSlots.map((slot) => (
+                  <div key={slot.id}>
+                    <strong>{slot.title}</strong>
+                    <span>{slot.placement}</span>
+                    <small>{slot.size}</small>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+
+          <div className="master-grid">
+            <AdSlot {...adSlots[1]} />
+            <article className="master-card">
+              <div className="section-heading compact">
+                <p className="eyebrow">Actividad</p>
+                <h3>Últimos movimientos demo</h3>
+              </div>
+              <div className="activity-list">
+                <span>Staff actualizó asistencia operativa.</span>
+                <span>Coordinación revisó reportes por deporte.</span>
+                <span>Jugador consultó ficha individual.</span>
+                <span>Master visualizó estadísticas globales.</span>
+              </div>
+            </article>
+          </div>
         </section>
       ) : null}
 
@@ -1976,6 +2129,7 @@ function App({ googleClientIdConfigured }: AppProps) {
       </section>
         </>
       ) : null}
+      <AdSlot {...adSlots[2]} />
     </main>
   );
 }
