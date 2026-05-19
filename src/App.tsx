@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
-type AttendanceStatus = 'Presente' | 'Ausente' | 'Tarde';
+type AttendanceStatus = 'Presente' | 'Ausente';
+type AttendanceActivity = 'Entrenamiento' | 'Partido';
 type UserRole = 'Usuario' | 'Staff' | 'Coordinación';
 type ReportPeriod =
   | 'Diario'
@@ -303,11 +304,11 @@ const initialAthletes: Athlete[] = [
     trainingsTotal: 12,
     matchesAttended: 4,
     matchesTotal: 5,
-    toursAttended: 0,
+    toursAttended: 1,
     toursTotal: 1,
     stayedAsGuest: true,
     hostedGuest: false,
-    status: 'Tarde',
+    status: 'Presente',
   },
   {
     id: 4,
@@ -337,10 +338,10 @@ const initialAthletes: Athlete[] = [
     matchesAttended: 2,
     matchesTotal: 4,
     toursAttended: 1,
-    toursTotal: 2,
+    toursTotal: 1,
     stayedAsGuest: false,
     hostedGuest: false,
-    status: 'Ausente',
+    status: 'Presente',
   },
 ];
 
@@ -517,6 +518,8 @@ function App({ googleClientIdConfigured }: AppProps) {
     status: 'Presente' as AttendanceStatus,
   });
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [attendanceActivity, setAttendanceActivity] =
+    useState<AttendanceActivity>('Entrenamiento');
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Semanal');
   const [reportSport, setReportSport] = useState(allSportsReportOption);
   const [reportScope, setReportScope] = useState<ReportScope>('General');
@@ -719,8 +722,8 @@ function App({ googleClientIdConfigured }: AppProps) {
       'Partidos totales',
       'Giras asistidas',
       'Giras totales',
-      'Se hospeda',
-      'Hospeda',
+      'Se aloja',
+      'Hospeda/recibe',
       'Puntaje ranking',
       'Activo',
       'Domicilio',
@@ -782,6 +785,86 @@ function App({ googleClientIdConfigured }: AppProps) {
     URL.revokeObjectURL(url);
   };
 
+  const updateAthlete = (athleteId: number, updates: Partial<Athlete>) => {
+    setAthleteList((currentAthletes) =>
+      currentAthletes.map((athlete) =>
+        athlete.id === athleteId ? { ...athlete, ...updates } : athlete,
+      ),
+    );
+  };
+
+  const markAllAttendancePresent = () => {
+    setAthleteList((currentAthletes) =>
+      currentAthletes.map((athlete) => {
+        if (attendanceActivity === 'Entrenamiento') {
+          const trainingsTotal = Math.max(athlete.trainingsTotal, 1);
+
+          return {
+            ...athlete,
+            status: 'Presente',
+            trainingsTotal,
+            trainingsAttended: trainingsTotal,
+          };
+        }
+
+        const matchesTotal = Math.max(athlete.matchesTotal, 1);
+
+        return {
+          ...athlete,
+          status: 'Presente',
+          matchesTotal,
+          matchesAttended: matchesTotal,
+        };
+      }),
+    );
+  };
+
+  const updateActivityAttendance = (athlete: Athlete, status: AttendanceStatus) => {
+    const isPresent = status === 'Presente';
+
+    if (attendanceActivity === 'Entrenamiento') {
+      const trainingsTotal = Math.max(athlete.trainingsTotal, 1);
+
+      updateAthlete(athlete.id, {
+        status,
+        trainingsTotal,
+        trainingsAttended: isPresent ? trainingsTotal : 0,
+      });
+      return;
+    }
+
+    const matchesTotal = Math.max(athlete.matchesTotal, 1);
+
+    updateAthlete(athlete.id, {
+      status,
+      matchesTotal,
+      matchesAttended: isPresent ? matchesTotal : 0,
+    });
+  };
+
+  const updateTourAttendance = (athlete: Athlete, isPresent: boolean) => {
+    const toursTotal = Math.max(athlete.toursTotal, 1);
+
+    updateAthlete(athlete.id, {
+      toursTotal,
+      toursAttended: isPresent ? toursTotal : 0,
+    });
+  };
+
+  const markAllToursPresent = () => {
+    setAthleteList((currentAthletes) =>
+      currentAthletes.map((athlete) => {
+        const toursTotal = Math.max(athlete.toursTotal, 1);
+
+        return {
+          ...athlete,
+          toursTotal,
+          toursAttended: toursTotal,
+        };
+      }),
+    );
+  };
+
   const handleReportScopeChange = (scope: ReportScope) => {
     setReportScope(scope);
     setReportTarget(
@@ -826,7 +909,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           <span>Sportia</span>
         </a>
         <div className="nav-links">
-          {isPrivilegedUser ? <a href="#asistencia">Asistencia</a> : null}
+          {isPrivilegedUser ? <a href="#control-asistencia">Asistencia</a> : null}
           {isPrivilegedUser ? <a href="#carga-datos">Carga</a> : null}
           <a href="#ranking">Ranking</a>
           {isPrivilegedUser ? <a href="#reportes">Reportes</a> : null}
@@ -999,8 +1082,8 @@ function App({ googleClientIdConfigured }: AppProps) {
                 <span>Entr. {athlete.trainingsAttended}/{athlete.trainingsTotal}</span>
                 <span>Part. {athlete.matchesAttended}/{athlete.matchesTotal}</span>
                 <span>Giras {athlete.toursAttended}/{athlete.toursTotal}</span>
-                <span>{athlete.stayedAsGuest ? 'Se hospeda' : 'No se hospeda'}</span>
-                <span>{athlete.hostedGuest ? 'Hospeda' : 'No hospeda'}</span>
+                <span>{athlete.stayedAsGuest ? 'Se aloja' : 'No se aloja'}</span>
+                <span>{athlete.hostedGuest ? 'Hospeda/recibe' : 'No hospeda'}</span>
               </div>
               <strong className="ranking-score">{score} pts</strong>
             </article>
@@ -1010,6 +1093,132 @@ function App({ googleClientIdConfigured }: AppProps) {
 
       {isPrivilegedUser ? (
         <>
+      <section className="operations-panel" id="control-asistencia" aria-labelledby="attendance-control-title">
+        <div className="section-heading">
+          <p className="eyebrow">Asistencia operativa</p>
+          <h2 id="attendance-control-title">Control de entrenamiento o partido</h2>
+          <p>
+            Todos los jugadores arrancan como presentes. El operador solo marca ausentes según
+            corresponda al entrenamiento o al partido seleccionado.
+          </p>
+        </div>
+
+        <div className="operation-toolbar">
+          <label>
+            Tipo de actividad
+            <select
+              value={attendanceActivity}
+              onChange={(event) =>
+                setAttendanceActivity(event.target.value as AttendanceActivity)
+              }
+            >
+              <option value="Entrenamiento">Entrenamiento</option>
+              <option value="Partido">Partido</option>
+            </select>
+          </label>
+          <button className="export-button" type="button" onClick={markAllAttendancePresent}>
+            Todos presentes
+          </button>
+        </div>
+
+        <div className="attendance-control-list">
+          {athleteList.map((athlete) => (
+            <article className="attendance-control-row" key={`attendance-${athlete.id}`}>
+              <div>
+                <strong>{getAthleteFullName(athlete)}</strong>
+                <span>
+                  {attendanceActivity} · {athlete.team || athlete.sport}
+                </span>
+              </div>
+              <div className="segmented-control" aria-label={`Asistencia de ${getAthleteFullName(athlete)}`}>
+                <button
+                  className={athlete.status === 'Presente' ? 'active' : ''}
+                  type="button"
+                  onClick={() => updateActivityAttendance(athlete, 'Presente')}
+                >
+                  Presente
+                </button>
+                <button
+                  className={athlete.status === 'Ausente' ? 'danger active' : 'danger'}
+                  type="button"
+                  onClick={() => updateActivityAttendance(athlete, 'Ausente')}
+                >
+                  Ausente
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="operations-panel" id="control-giras" aria-labelledby="tour-control-title">
+        <div className="section-heading">
+          <p className="eyebrow">Giras</p>
+          <h2 id="tour-control-title">Control de asistencia y hospedaje</h2>
+          <p>
+            En giras todos arrancan como presentes. Marcá ausentes y luego indicá quién se aloja
+            y quién hospeda/recibe jugadores.
+          </p>
+        </div>
+
+        <div className="operation-toolbar">
+          <button className="export-button" type="button" onClick={markAllToursPresent}>
+            Todos presentes en gira
+          </button>
+        </div>
+
+        <div className="tour-control-list">
+          {athleteList.map((athlete) => {
+            const isTourPresent = athlete.toursTotal === 0 || athlete.toursAttended >= athlete.toursTotal;
+
+            return (
+              <article className="tour-control-row" key={`tour-${athlete.id}`}>
+                <div>
+                  <strong>{getAthleteFullName(athlete)}</strong>
+                  <span>{athlete.cohort || athlete.team || athlete.sport}</span>
+                </div>
+                <div className="segmented-control" aria-label={`Gira de ${getAthleteFullName(athlete)}`}>
+                  <button
+                    className={isTourPresent ? 'active' : ''}
+                    type="button"
+                    onClick={() => updateTourAttendance(athlete, true)}
+                  >
+                    Presente
+                  </button>
+                  <button
+                    className={!isTourPresent ? 'danger active' : 'danger'}
+                    type="button"
+                    onClick={() => updateTourAttendance(athlete, false)}
+                  >
+                    Ausente
+                  </button>
+                </div>
+                <label className="inline-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={athlete.stayedAsGuest}
+                    onChange={(event) =>
+                      updateAthlete(athlete.id, { stayedAsGuest: event.target.checked })
+                    }
+                  />
+                  Se aloja
+                </label>
+                <label className="inline-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={athlete.hostedGuest}
+                    onChange={(event) =>
+                      updateAthlete(athlete.id, { hostedGuest: event.target.checked })
+                    }
+                  />
+                  Hospeda / recibe
+                </label>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="data-entry-panel" id="carga-datos" aria-labelledby="data-entry-title">
         <div className="section-heading">
           <p className="eyebrow">Carga de datos</p>
@@ -1137,7 +1346,6 @@ function App({ googleClientIdConfigured }: AppProps) {
               }
             >
               <option value="Presente">Presente</option>
-              <option value="Tarde">Tarde</option>
               <option value="Ausente">Ausente</option>
             </select>
           </label>
