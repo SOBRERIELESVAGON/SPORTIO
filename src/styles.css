@@ -629,6 +629,62 @@ button {
   font-weight: 800;
 }
 
+.ad-slot-live {
+  border-style: solid;
+  border-color: #86efac;
+  background: #f7fcf9;
+  text-align: left;
+}
+
+.ad-slot-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #166534;
+  background: #dcfce7;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.google-ad-container {
+  width: 100%;
+  min-height: 90px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.google-ad-hero,
+.google-ad-footer {
+  min-height: 120px;
+}
+
+.google-ad-sidebar {
+  min-height: 250px;
+}
+
+.google-ads-status {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 16px;
+  background: #f0fdf4;
+}
+
+.google-ads-status strong {
+  color: #102017;
+}
+
+.google-ads-status span,
+.google-ads-status small {
+  color: #667b6f;
+  font-weight: 700;
+}
+
 .data-entry-panel,
 .report-panel,
 .ranking-panel,

@@ -269,5 +269,13 @@
   "panel.eyebrow": "Étape suivante",
   "panel.title": "Premier module prêt à connecter des données réelles.",
   "panel.desc": "Cette base prépare l'expérience principale : enregistrement des présences, visualisation des indicateurs et classement des entraînements par sport ou équipe.",
-  "panel.start": "Démarrer le téléchargement"
+  "panel.start": "Démarrer le téléchargement",
+  "ad.googleLive": "Google AdSense active",
+  "ad.googleServed": "Google advertising · {size}",
+  "ad.googlePending": "Missing AdSense ad unit (slot) ID in .env for this placement.",
+  "ad.googleNotConfigured": "Google AdSense not configured",
+  "master.googleAds.title": "Google AdSense",
+  "master.googleAds.clientOk": "Publisher ID configured in .env",
+  "master.googleAds.clientMissing": "Add VITE_GOOGLE_ADSENSE_CLIENT to .env",
+  "master.googleAds.testMode": "Test mode enabled (VITE_GOOGLE_ADSENSE_TEST=true)"
 }

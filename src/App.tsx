@@ -16,6 +16,13 @@ import {
   type LanguageCode,
   type Translator,
 } from './i18n';
+import { GoogleAd } from './GoogleAd';
+import {
+  googleAdsConfig,
+  isGoogleAdPlacementConfigured,
+  isGoogleAdsClientConfigured,
+  type GoogleAdPlacement,
+} from './googleAds';
 import {
   downloadPlayerImportTemplate,
   parseSpreadsheetFile,
@@ -87,6 +94,7 @@ type AuthenticatedUser = {
 
 type AppProps = {
   googleClientIdConfigured: boolean;
+  googleAdsConfigured: boolean;
 };
 
 const sportOptions = [
@@ -134,23 +142,32 @@ const rolePasswords: Record<ProtectedRole, string> = {
 };
 const rankingScopes = ['Camada', 'Edad', 'Equipo'] as const;
 
-const adSlots = [
+const adSlots: {
+  id: string;
+  placement: GoogleAdPlacement;
+  titleKey: 'ad.hero.title' | 'ad.sidebar.title' | 'ad.footer.title';
+  placementKey: 'ad.hero.placement' | 'ad.sidebar.placement' | 'ad.footer.placement';
+  size: string;
+}[] = [
   {
     id: 'hero-ad',
-    title: 'Publicidad principal',
-    placement: 'Home / Ranking',
+    placement: 'hero',
+    titleKey: 'ad.hero.title',
+    placementKey: 'ad.hero.placement',
     size: '970 x 250',
   },
   {
     id: 'sidebar-ad',
-    title: 'Publicidad lateral',
-    placement: 'Paneles internos',
+    placement: 'sidebar',
+    titleKey: 'ad.sidebar.title',
+    placementKey: 'ad.sidebar.placement',
     size: '300 x 250',
   },
   {
     id: 'footer-ad',
-    title: 'Publicidad inferior',
-    placement: 'Todas las vistas',
+    placement: 'footer',
+    titleKey: 'ad.footer.title',
+    placementKey: 'ad.footer.placement',
     size: '728 x 90',
   },
 ];
@@ -412,22 +429,45 @@ function SportPreferenceSelector({
 }
 
 function AdSlot({
+  googlePlacement,
   title,
-  placement,
+  placementLabel,
   size,
   t,
 }: {
+  googlePlacement: GoogleAdPlacement;
   title: string;
-  placement: string;
+  placementLabel: string;
   size: string;
   t: Translator;
 }) {
+  const showsGoogleAd = isGoogleAdPlacementConfigured(googlePlacement);
+  const showsPendingGoogle =
+    isGoogleAdsClientConfigured() && !showsGoogleAd;
+
   return (
-    <aside className="ad-slot" aria-label={title}>
-      <span>{t('ad.space')}</span>
-      <strong>{title}</strong>
-      <p>{placement}</p>
-      <small>{t('ad.administered', { size })}</small>
+    <aside
+      className={`ad-slot ${showsGoogleAd ? 'ad-slot-live' : ''}`}
+      aria-label={title}
+    >
+      {showsGoogleAd ? (
+        <>
+          <span className="ad-slot-badge">{t('ad.googleLive')}</span>
+          <GoogleAd placement={googlePlacement} />
+          <small>{t('ad.googleServed', { size })}</small>
+        </>
+      ) : (
+        <>
+          <span>{t('ad.space')}</span>
+          <strong>{title}</strong>
+          <p>{placementLabel}</p>
+          {showsPendingGoogle ? (
+            <small>{t('ad.googlePending')}</small>
+          ) : (
+            <small>{t('ad.administered', { size })}</small>
+          )}
+        </>
+      )}
     </aside>
   );
 }
@@ -805,7 +845,7 @@ function LoginScreen({
   );
 }
 
-function App({ googleClientIdConfigured }: AppProps) {
+function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(() => {
     const storedLanguage = readStoredValue(languageKey);
@@ -1553,7 +1593,13 @@ function App({ googleClientIdConfigured }: AppProps) {
         <span>{t('banner.owner')}</span>
       </section>
 
-      <AdSlot title={t('ad.hero.title')} placement={t('ad.hero.placement')} size={adSlots[0].size} t={t} />
+      <AdSlot
+        googlePlacement={adSlots[0].placement}
+        title={t(adSlots[0].titleKey)}
+        placementLabel={t(adSlots[0].placementKey)}
+        size={adSlots[0].size}
+        t={t}
+      />
 
       {isPrivilegedUser ? (
         <section className="metrics-grid" aria-label={t('metrics.aria')}>
@@ -1626,11 +1672,29 @@ function App({ googleClientIdConfigured }: AppProps) {
                 <h3>{t('master.adInventory')}</h3>
               </div>
               <div className="ad-management-list">
+                <div className="google-ads-status">
+                  <strong>{t('master.googleAds.title')}</strong>
+                  <span>
+                    {googleAdsConfigured
+                      ? t('master.googleAds.clientOk')
+                      : t('master.googleAds.clientMissing')}
+                  </span>
+                  {googleAdsConfig.testMode ? (
+                    <small>{t('master.googleAds.testMode')}</small>
+                  ) : null}
+                </div>
                 {adSlots.map((slot) => (
                   <div key={slot.id}>
-                    <strong>{slot.title}</strong>
-                    <span>{slot.placement}</span>
-                    <small>{slot.size}</small>
+                    <strong>{t(slot.titleKey)}</strong>
+                    <span>{t(slot.placementKey)}</span>
+                    <small>
+                      {isGoogleAdPlacementConfigured(slot.placement)
+                        ? t('ad.googleLive')
+                        : googleAdsConfigured
+                          ? t('ad.googlePending')
+                          : t('ad.googleNotConfigured')}{' '}
+                      · {slot.size}
+                    </small>
                   </div>
                 ))}
               </div>
@@ -1638,7 +1702,13 @@ function App({ googleClientIdConfigured }: AppProps) {
           </div>
 
           <div className="master-grid">
-            <AdSlot title={t('ad.sidebar.title')} placement={t('ad.sidebar.placement')} size={adSlots[1].size} t={t} />
+            <AdSlot
+              googlePlacement={adSlots[1].placement}
+              title={t(adSlots[1].titleKey)}
+              placementLabel={t(adSlots[1].placementKey)}
+              size={adSlots[1].size}
+              t={t}
+            />
             <article className="master-card">
               <div className="section-heading compact">
                 <p className="eyebrow">{t('master.activity')}</p>
@@ -2559,7 +2629,13 @@ function App({ googleClientIdConfigured }: AppProps) {
       </section>
         </>
       ) : null}
-      <AdSlot title={t('ad.footer.title')} placement={t('ad.footer.placement')} size={adSlots[2].size} t={t} />
+      <AdSlot
+        googlePlacement={adSlots[2].placement}
+        title={t(adSlots[2].titleKey)}
+        placementLabel={t(adSlots[2].placementKey)}
+        size={adSlots[2].size}
+        t={t}
+      />
     </main>
   );
 }

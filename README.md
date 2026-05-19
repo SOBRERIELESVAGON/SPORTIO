@@ -38,6 +38,23 @@ VITE_GOOGLE_CLIENT_ID=tu-client-id-de-google.apps.googleusercontent.com
 Para desarrollo local agrega `http://localhost:5173` como origen autorizado en Google.
 Sin esa variable, Sportia muestra el acceso en modo demo.
 
+## Configurar publicidad de Google (AdSense)
+
+1. Crea una cuenta en [Google AdSense](https://www.google.com/adsense/) y agrega tu sitio.
+2. Crea **unidades publicitarias** para cada espacio (principal, lateral, inferior).
+3. Copia `.env.example` a `.env` y completa:
+
+```bash
+VITE_GOOGLE_ADSENSE_CLIENT=ca-pub-xxxxxxxxxxxxxxxx
+VITE_GOOGLE_ADSENSE_SLOT_HERO=1234567890
+VITE_GOOGLE_ADSENSE_SLOT_SIDEBAR=1234567891
+VITE_GOOGLE_ADSENSE_SLOT_FOOTER=1234567892
+```
+
+4. Opcional: `VITE_GOOGLE_ADSENSE_TEST=true` muestra anuncios de prueba mientras desarrollás.
+
+Los tres espacios de Sportia (home/ranking, paneles internos y pie de página) cargan el script de AdSense cuando el publisher ID y el slot correspondiente están configurados. Sin esas variables se muestra el marcador de espacio publicitario en modo demo. El rol **Master** ve en su panel el estado de cada unidad (activa, pendiente o sin configurar).
+
 ## Desarrollo
 
 ```bash
