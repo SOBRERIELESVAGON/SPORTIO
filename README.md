@@ -7,7 +7,7 @@ App de asistencia a entrenamientos deportivos multi-deporte.
 - Login con Google configurable por entorno.
 - Landing inicial para presentar Sportia.
 - Resumen de asistencia de un entrenamiento.
-- Modulo de carga de jugadores con apellido, nombre, DNI y datos de socio separados.
+- Modulo de carga de jugadores con apellido, nombre, DNI, obra social y datos de socio separados.
 - Exportacion a Excel/CSV con una columna por cada item de la ficha.
 - Reportes de asistencia con ejemplo diario, semanal, mensual, bimestral, trimestral, semestral y anual.
 - Vista de reportes por deporte, individual y general por division, equipo o camada.

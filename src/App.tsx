@@ -23,6 +23,8 @@ type Athlete = {
   age: string;
   phone: string;
   email: string;
+  healthInsurance: string;
+  healthInsuranceNumber: string;
   paymentMethod: string;
   memberStatus: 'Activo' | 'Inactivo';
   membershipType: string;
@@ -183,6 +185,8 @@ const initialAthletes: Athlete[] = [
     age: '8',
     phone: '3874098343',
     email: 'natalia.valdez1317@gmail.com',
+    healthInsurance: 'OSDE',
+    healthInsuranceNumber: '2-4613-08',
     paymentMethod: 'Mercado Pago',
     memberStatus: 'Activo',
     membershipType: 'Menor familia',
@@ -201,6 +205,8 @@ const initialAthletes: Athlete[] = [
     age: '14',
     phone: '3875551234',
     email: 'lucia.mendez@example.com',
+    healthInsurance: 'Swiss Medical',
+    healthInsuranceNumber: 'SM-54128882',
     paymentMethod: 'Transferencia',
     memberStatus: 'Activo',
     membershipType: 'Jugador juvenil',
@@ -219,6 +225,8 @@ const initialAthletes: Athlete[] = [
     age: '15',
     phone: '3875556778',
     email: 'mateo.rojas@example.com',
+    healthInsurance: 'Galeno',
+    healthInsuranceNumber: 'GA-52443219',
     paymentMethod: 'Efectivo',
     memberStatus: 'Activo',
     membershipType: 'Jugador juvenil',
@@ -237,6 +245,8 @@ const initialAthletes: Athlete[] = [
     age: '13',
     phone: '3875554321',
     email: 'sofia.arias@example.com',
+    healthInsurance: 'Medife',
+    healthInsuranceNumber: 'ME-53887102',
     paymentMethod: 'Debito automatico',
     memberStatus: 'Activo',
     membershipType: 'Jugadora juvenil',
@@ -395,6 +405,8 @@ function App({ googleClientIdConfigured }: AppProps) {
     age: '',
     phone: '',
     email: '',
+    healthInsurance: '',
+    healthInsuranceNumber: '',
     paymentMethod: '',
     memberStatus: 'Activo' as Athlete['memberStatus'],
     membershipType: '',
@@ -477,6 +489,8 @@ function App({ googleClientIdConfigured }: AppProps) {
       age: newAthlete.age.trim(),
       phone: newAthlete.phone.trim(),
       email: newAthlete.email.trim(),
+      healthInsurance: newAthlete.healthInsurance.trim(),
+      healthInsuranceNumber: newAthlete.healthInsuranceNumber.trim(),
       paymentMethod: newAthlete.paymentMethod.trim(),
       memberStatus: newAthlete.memberStatus,
       membershipType: newAthlete.membershipType.trim(),
@@ -496,6 +510,8 @@ function App({ googleClientIdConfigured }: AppProps) {
       age: '',
       phone: '',
       email: '',
+      healthInsurance: '',
+      healthInsuranceNumber: '',
       paymentMethod: '',
       memberStatus: 'Activo',
       membershipType: '',
@@ -522,6 +538,8 @@ function App({ googleClientIdConfigured }: AppProps) {
       'Edad',
       'Telefono/Celular',
       'Email',
+      'Obra social',
+      'Numero obra social',
       'Forma de pago',
       'Tipo socio',
       'Proximo cobro',
@@ -539,6 +557,8 @@ function App({ googleClientIdConfigured }: AppProps) {
       athlete.age,
       athlete.phone,
       athlete.email,
+      athlete.healthInsurance,
+      athlete.healthInsuranceNumber,
       athlete.paymentMethod,
       athlete.membershipType,
       athlete.nextBillingDate,
@@ -679,8 +699,8 @@ function App({ googleClientIdConfigured }: AppProps) {
           <p className="eyebrow">Carga de datos</p>
           <h2 id="data-entry-title">Registrar ficha de jugadores</h2>
           <p>
-            Carga apellido, nombre, DNI y datos de socio por separado para exportarlos a Excel
-            con columnas independientes.
+            Carga apellido, nombre, DNI, obra social y datos de socio por separado para
+            exportarlos a Excel con columnas independientes.
           </p>
         </div>
 
@@ -839,6 +859,33 @@ function App({ googleClientIdConfigured }: AppProps) {
                 setNewAthlete((current) => ({ ...current, email: event.target.value }))
               }
               placeholder="Ej: jugador@email.com"
+            />
+          </label>
+
+          <label>
+            Obra social
+            <input
+              type="text"
+              value={newAthlete.healthInsurance}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, healthInsurance: event.target.value }))
+              }
+              placeholder="Ej: OSDE"
+            />
+          </label>
+
+          <label>
+            Número obra social
+            <input
+              type="text"
+              value={newAthlete.healthInsuranceNumber}
+              onChange={(event) =>
+                setNewAthlete((current) => ({
+                  ...current,
+                  healthInsuranceNumber: event.target.value,
+                }))
+              }
+              placeholder="Ej: 2-4613-08"
             />
           </label>
 
