@@ -63,25 +63,26 @@ button {
     linear-gradient(135deg, #102017 0%, #0f3d2b 48%, #159447 100%);
 }
 
-.login-hero .brand {
+.login-hero .brand.brand-login {
   position: absolute;
   top: 46px;
+  gap: 15px;
+  font-size: 1.65rem;
 }
 
-.login-hero h1 {
-  max-width: 720px;
+.login-hero .brand.brand-login .brand-mark {
+  width: 57px;
+  height: 57px;
+  border-radius: 18px;
+  font-size: 1.35rem;
+}
+
+.login-hero-tagline {
+  max-width: 620px;
   margin: 0;
-  font-size: clamp(2.7rem, 6vw, 5.25rem);
-  line-height: 0.92;
-  letter-spacing: -0.08em;
-}
-
-.login-hero p:not(.eyebrow) {
-  max-width: 600px;
-  margin: 24px 0 0;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 1.12rem;
-  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 1.25rem;
+  line-height: 1.65;
 }
 
 .login-card {
@@ -1584,12 +1585,18 @@ button {
     min-height: 520px;
   }
 
-  .login-hero .brand {
+  .login-hero .brand.brand-login {
     top: 30px;
+    font-size: 1.45rem;
   }
 
-  .login-hero h1 {
-    font-size: 3rem;
+  .login-hero .brand.brand-login .brand-mark {
+    width: 50px;
+    height: 50px;
+  }
+
+  .login-hero-tagline {
+    font-size: 1.1rem;
   }
 
   .topbar {

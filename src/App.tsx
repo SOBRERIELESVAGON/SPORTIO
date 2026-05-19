@@ -834,13 +834,11 @@ function LoginScreen({
   return (
     <main className="login-layout">
       <section className="login-hero">
-        <a className="brand" href="#inicio" aria-label={t('common.brandHome')}>
+        <a className="brand brand-login" href="#inicio" aria-label={t('common.brandHome')}>
           <span className="brand-mark">S</span>
           <span>{t('common.brandName')}</span>
         </a>
-        <p className="eyebrow">{t('login.roleAccess')}</p>
-        <h1>{t('login.heroTitle')}</h1>
-        <p>{t('login.heroDesc')}</p>
+        <p className="login-hero-tagline">{t('login.heroTagline')}</p>
       </section>
 
       <section className="login-card" aria-labelledby="login-title">
