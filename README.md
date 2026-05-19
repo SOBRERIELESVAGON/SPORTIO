@@ -9,7 +9,7 @@ App de asistencia a entrenamientos deportivos multi-deporte.
 - Resumen de asistencia de un entrenamiento.
 - Modulo de carga de deportistas con desplegable de deporte y asistencia.
 - Reportes de asistencia con ejemplo diario, semanal, mensual, bimestral, trimestral, semestral y anual.
-- Vista de reportes individual y general por division, equipo o camada.
+- Vista de reportes por deporte, individual y general por division, equipo o camada.
 - Indicadores principales de deportistas, equipos y asistencia.
 - Agenda de proximas sesiones por equipo/deporte.
 

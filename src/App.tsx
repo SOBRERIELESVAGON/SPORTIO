@@ -64,6 +64,8 @@ const sportOptions = [
   'Lacrosse',
 ];
 
+const allSportsReportOption = 'Todos los deportes';
+
 const reportPeriods: ReportPeriod[] = [
   'Diario',
   'Semanal',
@@ -126,6 +128,28 @@ const reportSeriesByPeriod: Record<ReportPeriod, { label: string; attendance: nu
     { label: '2025', attendance: 90 },
   ],
 };
+
+function clampAttendance(value: number) {
+  return Math.min(100, Math.max(0, value));
+}
+
+function buildSportReportSeries(period: ReportPeriod, sport: string) {
+  const baseSeries = reportSeriesByPeriod[period];
+
+  if (sport === allSportsReportOption) {
+    return baseSeries;
+  }
+
+  const sportIndex = sportOptions.indexOf(sport);
+  const sportOffset = ((sportIndex % 5) - 2) * 3;
+
+  return baseSeries.map((item, index) => ({
+    ...item,
+    attendance: clampAttendance(
+      item.attendance + sportOffset + (index % 2 === 0 ? sportIndex % 4 : -(sportIndex % 3)),
+    ),
+  }));
+}
 
 const initialAthletes: Athlete[] = [
   { id: 1, name: 'Lucia Mendez', sport: 'Fútbol', status: 'Presente' },
@@ -280,22 +304,29 @@ function App({ googleClientIdConfigured }: AppProps) {
   });
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Semanal');
+  const [reportSport, setReportSport] = useState(allSportsReportOption);
   const [reportScope, setReportScope] = useState<ReportScope>('General');
   const [reportTarget, setReportTarget] = useState(reportGroupsByScope.General[0]);
   const presentCount = athleteList.filter((athlete) => athlete.status === 'Presente').length;
   const attendancePercentage = Math.round((presentCount / athleteList.length) * 100);
   const teamCount = new Set(athleteList.map((athlete) => athlete.sport)).size;
-  const reportSeries = reportSeriesByPeriod[reportPeriod];
+  const reportSeries = buildSportReportSeries(reportPeriod, reportSport);
   const reportAverage = Math.round(
     reportSeries.reduce((total, item) => total + item.attendance, 0) / reportSeries.length,
   );
   const reportPeak = reportSeries.reduce((best, item) =>
     item.attendance > best.attendance ? item : best,
   );
+  const athletesForReportSport =
+    reportSport === allSportsReportOption
+      ? athleteList
+      : athleteList.filter((athlete) => athlete.sport === reportSport);
+  const individualReportTargets =
+    athletesForReportSport.length > 0
+      ? athletesForReportSport.map((athlete) => athlete.name)
+      : ['Sin deportistas cargados'];
   const reportTargetOptions =
-    reportScope === 'Individual'
-      ? athleteList.map((athlete) => athlete.name)
-      : reportGroupsByScope[reportScope];
+    reportScope === 'Individual' ? individualReportTargets : reportGroupsByScope[reportScope];
   const metrics = [
     { label: 'Deportistas cargados', value: String(athleteList.length) },
     { label: 'Asistencia de hoy', value: `${attendancePercentage}%` },
@@ -348,8 +379,21 @@ function App({ googleClientIdConfigured }: AppProps) {
   const handleReportScopeChange = (scope: ReportScope) => {
     setReportScope(scope);
     setReportTarget(
-      scope === 'Individual' ? athleteList[0]?.name ?? '' : reportGroupsByScope[scope][0],
+      scope === 'Individual' ? individualReportTargets[0] : reportGroupsByScope[scope][0],
     );
+  };
+
+  const handleReportSportChange = (sport: string) => {
+    const athletesInSelectedSport =
+      sport === allSportsReportOption
+        ? athleteList
+        : athleteList.filter((athlete) => athlete.sport === sport);
+
+    setReportSport(sport);
+
+    if (reportScope === 'Individual') {
+      setReportTarget(athletesInSelectedSport[0]?.name ?? 'Sin deportistas cargados');
+    }
   };
 
   if (!user) {
@@ -553,6 +597,17 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
+            Deporte
+            <select value={reportSport} onChange={(event) => handleReportSportChange(event.target.value)}>
+              {[allSportsReportOption, ...sportOptions].map((sport) => (
+                <option value={sport} key={sport}>
+                  {sport}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
             Alcance
             <select
               value={reportScope}
@@ -582,7 +637,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           <article>
             <span>Reporte</span>
             <strong>
-              {reportPeriod} · {reportTarget}
+              {reportPeriod} · {reportSport} · {reportTarget}
             </strong>
           </article>
           <article>
@@ -597,7 +652,10 @@ function App({ googleClientIdConfigured }: AppProps) {
           </article>
         </div>
 
-        <div className="chart-card" aria-label={`Gráfico de asistencia ${reportPeriod}`}>
+        <div
+          className="chart-card"
+          aria-label={`Gráfico de asistencia ${reportPeriod} de ${reportSport}`}
+        >
           <div className="chart-grid" aria-hidden="true">
             {reportSeries.map((item) => (
               <div className="chart-column" key={`${reportPeriod}-${item.label}`}>
@@ -612,9 +670,10 @@ function App({ googleClientIdConfigured }: AppProps) {
         </div>
 
         <p className="report-note">
-          Ejemplo: si elegís <strong>Individual</strong>, el gráfico muestra el rendimiento de un
-          deportista. Si elegís <strong>División</strong>, <strong>Equipo</strong> o{' '}
-          <strong>Camada</strong>, muestra el consolidado del grupo seleccionado.
+          Ejemplo: si elegís <strong>Fútbol</strong>, todo el gráfico se recalcula para Fútbol.
+          Si además elegís <strong>Individual</strong>, muestra un deportista de ese deporte; con{' '}
+          <strong>División</strong>, <strong>Equipo</strong> o <strong>Camada</strong>, muestra el
+          consolidado del grupo seleccionado dentro de ese deporte.
         </p>
       </section>
 
