@@ -21,7 +21,9 @@ type Athlete = {
   address: string;
   birthDate: string;
   age: string;
-  phone: string;
+  playerPhone: string;
+  fatherPhone: string;
+  motherPhone: string;
   email: string;
   healthInsurance: string;
   healthInsuranceNumber: string;
@@ -183,7 +185,9 @@ const initialAthletes: Athlete[] = [
     address: 'Avenida Paraguay 526, Salta',
     birthDate: '27/02/2018',
     age: '8',
-    phone: '3874098343',
+    playerPhone: '3874098343',
+    fatherPhone: '3875001001',
+    motherPhone: '3875001002',
     email: 'natalia.valdez1317@gmail.com',
     healthInsurance: 'OSDE',
     healthInsuranceNumber: '2-4613-08',
@@ -203,7 +207,9 @@ const initialAthletes: Athlete[] = [
     address: 'Las Heras 120, Salta',
     birthDate: '14/08/2011',
     age: '14',
-    phone: '3875551234',
+    playerPhone: '3875551234',
+    fatherPhone: '3875551200',
+    motherPhone: '3875551201',
     email: 'lucia.mendez@example.com',
     healthInsurance: 'Swiss Medical',
     healthInsuranceNumber: 'SM-54128882',
@@ -223,7 +229,9 @@ const initialAthletes: Athlete[] = [
     address: 'Belgrano 880, Salta',
     birthDate: '03/11/2010',
     age: '15',
-    phone: '3875556778',
+    playerPhone: '3875556778',
+    fatherPhone: '3875556700',
+    motherPhone: '3875556701',
     email: 'mateo.rojas@example.com',
     healthInsurance: 'Galeno',
     healthInsuranceNumber: 'GA-52443219',
@@ -243,7 +251,9 @@ const initialAthletes: Athlete[] = [
     address: 'San Martin 410, Salta',
     birthDate: '22/05/2012',
     age: '13',
-    phone: '3875554321',
+    playerPhone: '3875554321',
+    fatherPhone: '3875554300',
+    motherPhone: '3875554301',
     email: 'sofia.arias@example.com',
     healthInsurance: 'Medife',
     healthInsuranceNumber: 'ME-53887102',
@@ -403,7 +413,9 @@ function App({ googleClientIdConfigured }: AppProps) {
     address: '',
     birthDate: '',
     age: '',
-    phone: '',
+    playerPhone: '',
+    fatherPhone: '',
+    motherPhone: '',
     email: '',
     healthInsurance: '',
     healthInsuranceNumber: '',
@@ -487,7 +499,9 @@ function App({ googleClientIdConfigured }: AppProps) {
       address: newAthlete.address.trim(),
       birthDate: newAthlete.birthDate.trim(),
       age: newAthlete.age.trim(),
-      phone: newAthlete.phone.trim(),
+      playerPhone: newAthlete.playerPhone.trim(),
+      fatherPhone: newAthlete.fatherPhone.trim(),
+      motherPhone: newAthlete.motherPhone.trim(),
       email: newAthlete.email.trim(),
       healthInsurance: newAthlete.healthInsurance.trim(),
       healthInsuranceNumber: newAthlete.healthInsuranceNumber.trim(),
@@ -508,7 +522,9 @@ function App({ googleClientIdConfigured }: AppProps) {
       address: '',
       birthDate: '',
       age: '',
-      phone: '',
+      playerPhone: '',
+      fatherPhone: '',
+      motherPhone: '',
       email: '',
       healthInsurance: '',
       healthInsuranceNumber: '',
@@ -536,7 +552,9 @@ function App({ googleClientIdConfigured }: AppProps) {
       'Domicilio',
       'Fecha nacimiento',
       'Edad',
-      'Telefono/Celular',
+      'Celular jugador',
+      'Celular padre',
+      'Celular madre',
       'Email',
       'Obra social',
       'Numero obra social',
@@ -555,7 +573,9 @@ function App({ googleClientIdConfigured }: AppProps) {
       athlete.address,
       athlete.birthDate,
       athlete.age,
-      athlete.phone,
+      athlete.playerPhone,
+      athlete.fatherPhone,
+      athlete.motherPhone,
       athlete.email,
       athlete.healthInsurance,
       athlete.healthInsuranceNumber,
@@ -839,14 +859,38 @@ function App({ googleClientIdConfigured }: AppProps) {
           </label>
 
           <label>
-            Teléfono / celular
+            Celular jugador
             <input
               type="text"
-              value={newAthlete.phone}
+              value={newAthlete.playerPhone}
               onChange={(event) =>
-                setNewAthlete((current) => ({ ...current, phone: event.target.value }))
+                setNewAthlete((current) => ({ ...current, playerPhone: event.target.value }))
               }
               placeholder="Ej: 3874098343"
+            />
+          </label>
+
+          <label>
+            Celular padre
+            <input
+              type="text"
+              value={newAthlete.fatherPhone}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, fatherPhone: event.target.value }))
+              }
+              placeholder="Ej: 3875001001"
+            />
+          </label>
+
+          <label>
+            Celular madre
+            <input
+              type="text"
+              value={newAthlete.motherPhone}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, motherPhone: event.target.value }))
+              }
+              placeholder="Ej: 3875001002"
             />
           </label>
 
