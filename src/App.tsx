@@ -184,13 +184,6 @@ const reportPeriods: ReportPeriod[] = [
 
 const reportScopes: ReportScope[] = ['General', 'División', 'Equipo', 'Camada', 'Individual'];
 
-const reportGroupsByScope: Record<Exclude<ReportScope, 'Individual'>, string[]> = {
-  General: ['Toda la institución'],
-  División: ['Sub 14', 'Sub 16', 'Sub 18', 'Primera'],
-  Equipo: ['Fútbol Sub 16', 'Rugby M17', 'Vóley mixto', 'Básquet femenino'],
-  Camada: ['Camada 2008', 'Camada 2009', 'Camada 2010', 'Camada 2011'],
-};
-
 const reportSeriesByPeriod: Record<ReportPeriod, { label: string; attendance: number }[]> = {
   Diario: [
     { label: 'Lun', attendance: 82 },
@@ -259,6 +252,106 @@ function buildSportReportSeries(period: ReportPeriod, sport: string) {
 
 function getAthleteFullName(athlete: Athlete) {
   return `${athlete.lastName} ${athlete.firstName}`.trim();
+}
+
+function filterAthletesBySport(athletes: Athlete[], sport: string) {
+  return sport === ALL_SPORTS_VALUE ? athletes : athletes.filter((athlete) => athlete.sport === sport);
+}
+
+function getDivisionFromTeam(team: string) {
+  const trimmedTeam = team.trim();
+
+  if (!trimmedTeam) {
+    return '';
+  }
+
+  const subDivision = trimmedTeam.match(/Sub\s*\d+/i);
+
+  if (subDivision) {
+    return subDivision[0].replace(/\s+/g, ' ');
+  }
+
+  const youthDivision = trimmedTeam.match(/\bM\d+\b/i);
+
+  if (youthDivision) {
+    return youthDivision[0];
+  }
+
+  if (/primera/i.test(trimmedTeam)) {
+    return 'Primera';
+  }
+
+  return trimmedTeam;
+}
+
+function getReportGroupOptions(
+  athletes: Athlete[],
+  scope: ReportScope,
+  sport: string,
+  labels: { wholeInstitution: string; noAthletes: string },
+) {
+  if (scope === 'Individual') {
+    return athletes.length > 0
+      ? athletes.map((athlete) => getAthleteFullName(athlete))
+      : [labels.noAthletes];
+  }
+
+  if (scope === 'General') {
+    if (sport === ALL_SPORTS_VALUE) {
+      return [labels.wholeInstitution];
+    }
+
+    return sport ? [sport] : [labels.noAthletes];
+  }
+
+  if (scope === 'Equipo') {
+    const teams = Array.from(new Set(athletes.map((athlete) => athlete.team).filter(Boolean))).sort();
+
+    return teams.length > 0 ? teams : [labels.noAthletes];
+  }
+
+  if (scope === 'Camada') {
+    const cohorts = Array.from(
+      new Set(athletes.map((athlete) => athlete.cohort).filter(Boolean)),
+    ).sort();
+
+    return cohorts.length > 0 ? cohorts : [labels.noAthletes];
+  }
+
+  const divisions = Array.from(
+    new Set(athletes.map((athlete) => getDivisionFromTeam(athlete.team)).filter(Boolean)),
+  ).sort();
+
+  return divisions.length > 0 ? divisions : [labels.noAthletes];
+}
+
+function filterAthletesForReportScope(
+  athletes: Athlete[],
+  scope: ReportScope,
+  target: string,
+  emptyTargetLabel: string,
+) {
+  if (target === emptyTargetLabel) {
+    return [];
+  }
+
+  if (scope === 'General') {
+    return athletes;
+  }
+
+  if (scope === 'Equipo') {
+    return athletes.filter((athlete) => athlete.team === target);
+  }
+
+  if (scope === 'Camada') {
+    return athletes.filter((athlete) => athlete.cohort === target);
+  }
+
+  if (scope === 'División') {
+    return athletes.filter((athlete) => getDivisionFromTeam(athlete.team) === target);
+  }
+
+  return athletes.filter((athlete) => getAthleteFullName(athlete) === target);
 }
 
 function ratio(attended: number, total: number) {
@@ -605,6 +698,39 @@ const initialAthletes: Athlete[] = [
     hostedGuest: false,
     status: 'Presente',
   },
+  {
+    id: 5,
+    memberNumber: '4617',
+    lastName: 'FERRERO',
+    firstName: 'TOMAS',
+    dni: '55.102.441',
+    address: 'Mitre 220, Salta',
+    birthDate: '09/02/2009',
+    age: '17',
+    playerPhone: '3875559988',
+    fatherPhone: '3875559900',
+    motherPhone: '3875559901',
+    email: 'tomas.ferrero@example.com',
+    healthInsurance: 'OSDE',
+    healthInsuranceNumber: 'OS-55102441',
+    paymentMethod: 'Debito automatico',
+    memberStatus: 'Activo',
+    membershipType: 'Jugador juvenil',
+    nextBillingDate: '30/04/2026',
+    sport: 'Rugby',
+    team: 'Rugby M17',
+    cohort: 'Camada 2009',
+    perfectAttendance30Days: true,
+    trainingsAttended: 12,
+    trainingsTotal: 12,
+    matchesAttended: 5,
+    matchesTotal: 5,
+    toursAttended: 2,
+    toursTotal: 2,
+    stayedAsGuest: false,
+    hostedGuest: true,
+    status: 'Presente',
+  },
 ];
 
 function decodeGoogleCredential(credential: string): GoogleJwtPayload | null {
@@ -685,6 +811,9 @@ function LoginScreen({
   );
   const [selectedAthleteId, setSelectedAthleteId] = useState(athletes[0]?.id ?? 0);
   const [googleIdentity, setGoogleIdentity] = useState<string | null>(null);
+  const activeAthleteId = athletes.some((athlete) => athlete.id === selectedAthleteId)
+    ? selectedAthleteId
+    : (athletes[0]?.id ?? 0);
 
   const handleStaffSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -822,7 +951,7 @@ function LoginScreen({
           <label>
             {t('login.playerLabel')}
             <select
-              value={selectedAthleteId}
+              value={activeAthleteId}
               onChange={(event) => setSelectedAthleteId(Number(event.target.value))}
             >
               {athletes.map((athlete) => (
@@ -835,7 +964,7 @@ function LoginScreen({
           <button
             className="export-button"
             type="button"
-            onClick={() => onPlayerAccess(selectedAthleteId)}
+            onClick={() => onPlayerAccess(activeAthleteId)}
           >
             {t('login.enterAsPlayer')}
           </button>
@@ -922,14 +1051,54 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Semanal');
   const [reportSport, setReportSport] = useState(preferredSport);
   const [reportScope, setReportScope] = useState<ReportScope>('General');
-  const [reportTarget, setReportTarget] = useState(reportGroupsByScope.General[0]);
-  const presentCount = athleteList.filter((athlete) => athlete.status === 'Presente').length;
+  const [reportTarget, setReportTarget] = useState(() =>
+    getReportGroupOptions(athleteList, 'General', preferredSport, {
+      wholeInstitution: 'Toda la institución',
+      noAthletes: 'Sin deportistas cargados',
+    })[0],
+  );
+  const athletesForView = useMemo(
+    () => athleteList.filter((athlete) => athlete.sport === preferredSport),
+    [athleteList, preferredSport],
+  );
+  const presentCount = athletesForView.filter((athlete) => athlete.status === 'Presente').length;
   const isPrivilegedUser = userRole === 'Staff' || userRole === 'Coordinación' || userRole === 'Master';
   const canImportPlayers = userRole === 'Staff' || userRole === 'Coordinación';
   const isMasterUser = userRole === 'Master';
   const selectedPlayer = athleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
-  const attendancePercentage = Math.round((presentCount / athleteList.length) * 100);
-  const perfectAttendanceCount = athleteList.filter(
+  const attendancePercentage =
+    athletesForView.length > 0
+      ? Math.round((presentCount / athletesForView.length) * 100)
+      : 0;
+  const reportLabels = useMemo(
+    () => ({
+      wholeInstitution: t('report.wholeInstitution'),
+      noAthletes: t('report.noAthletes'),
+    }),
+    [t],
+  );
+  const athletesForReportSport = useMemo(
+    () => filterAthletesBySport(athleteList, reportSport),
+    [athleteList, reportSport],
+  );
+  const reportTargetOptions = useMemo(
+    () => getReportGroupOptions(athletesForReportSport, reportScope, reportSport, reportLabels),
+    [athletesForReportSport, reportScope, reportSport, reportLabels],
+  );
+  const normalizedReportTarget = reportTargetOptions.includes(reportTarget)
+    ? reportTarget
+    : reportTargetOptions[0];
+  const reportScopedAthletes = useMemo(
+    () =>
+      filterAthletesForReportScope(
+        athletesForReportSport,
+        reportScope,
+        normalizedReportTarget,
+        reportLabels.noAthletes,
+      ),
+    [athletesForReportSport, reportScope, normalizedReportTarget, reportLabels.noAthletes],
+  );
+  const scopedPerfectAttendanceCount = reportScopedAthletes.filter(
     (athlete) => athlete.perfectAttendance30Days,
   ).length;
   const reportSeries = buildSportReportSeries(reportPeriod, reportSport);
@@ -939,22 +1108,12 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const reportPeak = reportSeries.reduce((best, item) =>
     item.attendance > best.attendance ? item : best,
   );
-  const athletesForReportSport =
-    reportSport === ALL_SPORTS_VALUE
-      ? athleteList
-      : athleteList.filter((athlete) => athlete.sport === reportSport);
-  const individualReportTargets =
-    athletesForReportSport.length > 0
-      ? athletesForReportSport.map((athlete) => getAthleteFullName(athlete))
-      : [t('report.noAthletes')];
-  const reportTargetOptions =
-    reportScope === 'Individual' ? individualReportTargets : reportGroupsByScope[reportScope];
   const [rankingSport, setRankingSport] = useState(preferredSport);
   const [rankingScope, setRankingScope] = useState<(typeof rankingScopes)[number]>('Camada');
-  const rankingCandidates =
-    rankingSport === ALL_SPORTS_VALUE
-      ? athleteList
-      : athleteList.filter((athlete) => athlete.sport === rankingSport);
+  const rankingCandidates = useMemo(
+    () => filterAthletesBySport(athleteList, rankingSport),
+    [athleteList, rankingSport],
+  );
   const rankingGroupOptions = Array.from(
     new Set(
       rankingCandidates.map((athlete) => {
@@ -997,19 +1156,33 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     }))
     .sort((left, right) => right.score - left.score);
   const metrics = [
-    { label: t('metrics.loadedAthletes'), value: String(athleteList.length) },
+    { label: t('metrics.loadedAthletes'), value: String(athletesForView.length) },
     { label: t('metrics.todayAttendance'), value: `${attendancePercentage}%` },
-    { label: t('metrics.medals30'), value: String(perfectAttendanceCount) },
+    {
+      label: t('metrics.medals30'),
+      value: String(
+        athletesForView.filter((athlete) => athlete.perfectAttendance30Days).length,
+      ),
+    },
   ];
-  const activePlayersCount = athleteList.filter((athlete) => athlete.memberStatus === 'Activo').length;
-  const totalTeamsCount = new Set(athleteList.map((athlete) => athlete.team).filter(Boolean)).size;
-  const totalCohortsCount = new Set(athleteList.map((athlete) => athlete.cohort).filter(Boolean)).size;
-  const averageRankingScore = Math.round(
-    athleteList.reduce((total, athlete) => total + calculateRankingScore(athlete), 0) /
-      athleteList.length,
-  );
+  const activePlayersCount = athletesForView.filter(
+    (athlete) => athlete.memberStatus === 'Activo',
+  ).length;
+  const totalTeamsCount = new Set(
+    athletesForView.map((athlete) => athlete.team).filter(Boolean),
+  ).size;
+  const totalCohortsCount = new Set(
+    athletesForView.map((athlete) => athlete.cohort).filter(Boolean),
+  ).size;
+  const averageRankingScore =
+    athletesForView.length > 0
+      ? Math.round(
+          athletesForView.reduce((total, athlete) => total + calculateRankingScore(athlete), 0) /
+            athletesForView.length,
+        )
+      : 0;
   const masterStats = [
-    { label: t('master.stat.totalPlayers'), value: String(athleteList.length) },
+    { label: t('master.stat.totalPlayers'), value: String(athletesForView.length) },
     { label: t('master.stat.activePlayers'), value: String(activePlayersCount) },
     { label: t('master.stat.teams'), value: String(totalTeamsCount) },
     { label: t('master.stat.cohorts'), value: String(totalCohortsCount) },
@@ -1048,6 +1221,16 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setReportSport(sport);
     setRankingSport(sport);
     setNewAthlete((currentAthlete) => ({ ...currentAthlete, sport }));
+
+    const athletesInSport = filterAthletesBySport(athleteList, sport);
+    const nextTargetOptions = getReportGroupOptions(
+      athletesInSport,
+      reportScope,
+      sport,
+      reportLabels,
+    );
+
+    setReportTarget(nextTargetOptions[0]);
   };
 
   const handlePlayerAccess = (athleteId: number) => {
@@ -1330,7 +1513,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       'Tipo socio',
       'Proximo cobro',
     ];
-    const rows = athleteList.map((athlete) => [
+    const rows = athletesForView.map((athlete) => [
       athlete.memberNumber,
       athlete.lastName,
       athlete.firstName,
@@ -1387,6 +1570,10 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const markAllAttendancePresent = () => {
     setAthleteList((currentAthletes) =>
       currentAthletes.map((athlete) => {
+        if (athlete.sport !== preferredSport) {
+          return athlete;
+        }
+
         if (attendanceActivity === 'Entrenamiento') {
           const trainingsTotal = Math.max(athlete.trainingsTotal, 1);
 
@@ -1445,6 +1632,10 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const markAllToursPresent = () => {
     setAthleteList((currentAthletes) =>
       currentAthletes.map((athlete) => {
+        if (athlete.sport !== preferredSport) {
+          return athlete;
+        }
+
         const toursTotal = Math.max(athlete.toursTotal, 1);
 
         return {
@@ -1457,34 +1648,36 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   };
 
   const handleReportScopeChange = (scope: ReportScope) => {
-    setReportScope(scope);
-    setReportTarget(
-      scope === 'Individual' ? individualReportTargets[0] : reportGroupsByScope[scope][0],
+    const athletesInSport = filterAthletesBySport(athleteList, reportSport);
+    const nextTargetOptions = getReportGroupOptions(
+      athletesInSport,
+      scope,
+      reportSport,
+      reportLabels,
     );
+
+    setReportScope(scope);
+    setReportTarget(nextTargetOptions[0]);
   };
 
   const handleReportSportChange = (sport: string) => {
-    const athletesInSelectedSport =
-      sport === ALL_SPORTS_VALUE
-        ? athleteList
-        : athleteList.filter((athlete) => athlete.sport === sport);
+    const athletesInSport = filterAthletesBySport(athleteList, sport);
+    const nextTargetOptions = getReportGroupOptions(
+      athletesInSport,
+      reportScope,
+      sport,
+      reportLabels,
+    );
 
     setReportSport(sport);
-
-    if (reportScope === 'Individual') {
-      setReportTarget(
-        athletesInSelectedSport[0]
-          ? getAthleteFullName(athletesInSelectedSport[0])
-          : t('report.noAthletes'),
-      );
-    }
+    setReportTarget(nextTargetOptions[0]);
   };
 
   if (!user) {
     return (
       <LoginScreen
         error={authError}
-        athletes={athleteList}
+        athletes={athletesForView}
         googleClientIdConfigured={googleClientIdConfigured}
         onGoogleError={() => setAuthError(t('auth.googleError'))}
         onLanguageChange={handleLanguageChange}
@@ -1576,11 +1769,11 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           <aside className="attendance-card" id="asistencia" aria-label={t('hero.attendanceSummary')}>
             <div className="card-header">
               <span>{t('hero.trainingToday')}</span>
-              <strong>{presentCount}/{athleteList.length}</strong>
+              <strong>{presentCount}/{athletesForView.length}</strong>
             </div>
             <h2>{t('hero.quickList')}</h2>
             <div className="athlete-list">
-              {athleteList.slice(0, 5).map((athlete) => (
+              {athletesForView.slice(0, 5).map((athlete) => (
                 <article className="athlete-row" key={athlete.id}>
                   <div>
                     <strong>{getAthleteFullName(athlete)}</strong>
@@ -1686,7 +1879,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                 </div>
                 <div>
                   <span>{t('master.players')}</span>
-                  <strong>{athleteList.length}</strong>
+                  <strong>{athletesForView.length}</strong>
                   <small>{t('common.free')}</small>
                 </div>
               </div>
@@ -1914,7 +2107,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         </div>
 
         <div className="attendance-control-list">
-          {athleteList.map((athlete) => (
+          {athletesForView.map((athlete) => (
             <article className="attendance-control-row" key={`attendance-${athlete.id}`}>
               <div>
                 <strong>{getAthleteFullName(athlete)}</strong>
@@ -1959,7 +2152,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         </div>
 
         <div className="tour-control-list">
-          {athleteList.map((athlete) => {
+          {athletesForView.map((athlete) => {
             const isTourPresent = athlete.toursTotal === 0 || athlete.toursAttended >= athlete.toursTotal;
 
             return (
@@ -2531,7 +2724,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
             <span>{t('table.medal30')}</span>
             <span>{t('profile.attendance')}</span>
           </div>
-          {athleteList.map((athlete) => (
+          {athletesForView.map((athlete) => (
             <article className="data-table-row" key={athlete.id}>
               <span>{athlete.memberNumber || '-'}</span>
               <strong>{getAthleteFullName(athlete)}</strong>
@@ -2601,7 +2794,10 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
 
           <label>
             {reportScope === 'Individual' ? t('report.player') : translateReportScope(selectedLanguage, reportScope)}
-            <select value={reportTarget} onChange={(event) => setReportTarget(event.target.value)}>
+            <select
+              value={normalizedReportTarget}
+              onChange={(event) => setReportTarget(event.target.value)}
+            >
               {reportTargetOptions.map((target) => (
                 <option value={target} key={target}>
                   {target}
@@ -2615,7 +2811,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           <article>
             <span>{t('report.summary.label')}</span>
             <strong>
-              {translateReportPeriod(selectedLanguage, reportPeriod)} · {reportSport === ALL_SPORTS_VALUE ? getAllSportsLabel(selectedLanguage) : reportSport} · {reportTarget}
+              {translateReportPeriod(selectedLanguage, reportPeriod)} · {reportSport === ALL_SPORTS_VALUE ? getAllSportsLabel(selectedLanguage) : reportSport} · {normalizedReportTarget}
             </strong>
           </article>
           <article>
@@ -2630,7 +2826,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           </article>
           <article>
             <span>{t('report.summary.medals')}</span>
-            <strong>{perfectAttendanceCount}</strong>
+            <strong>{scopedPerfectAttendanceCount}</strong>
           </article>
         </div>
 
@@ -2640,7 +2836,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           </div>
           <div>
             <p className="eyebrow">{t('report.medal.eyebrow')}</p>
-            <h3>{t('report.medal.title', { count: perfectAttendanceCount })}</h3>
+            <h3>{t('report.medal.title', { count: scopedPerfectAttendanceCount })}</h3>
             <p>
               {t('report.medal.desc')}
             </p>
