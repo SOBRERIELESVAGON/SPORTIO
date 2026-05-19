@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+
+type AttendanceStatus = 'Presente' | 'Ausente' | 'Tarde';
 
 type Athlete = {
   id: number;
   name: string;
   sport: string;
-  status: 'Presente' | 'Ausente' | 'Tarde';
+  status: AttendanceStatus;
 };
 
 type Session = {
@@ -34,7 +36,7 @@ type AppProps = {
   googleClientIdConfigured: boolean;
 };
 
-const athletes: Athlete[] = [
+const initialAthletes: Athlete[] = [
   { id: 1, name: 'Lucia Mendez', sport: 'Futbol', status: 'Presente' },
   { id: 2, name: 'Mateo Rojas', sport: 'Basquet', status: 'Tarde' },
   { id: 3, name: 'Sofia Arias', sport: 'Voley', status: 'Presente' },
@@ -63,12 +65,6 @@ const sessions: Session[] = [
     time: 'Viernes, 19:00',
     attendance: 78,
   },
-];
-
-const metrics = [
-  { label: 'Deportistas activos', value: '148' },
-  { label: 'Asistencia semanal', value: '89%' },
-  { label: 'Equipos registrados', value: '12' },
 ];
 
 function decodeGoogleCredential(credential: string): GoogleJwtPayload | null {
@@ -185,7 +181,21 @@ function LoginScreen({
 function App({ googleClientIdConfigured }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const presentCount = athletes.filter((athlete) => athlete.status === 'Presente').length;
+  const [athleteList, setAthleteList] = useState<Athlete[]>(initialAthletes);
+  const [newAthlete, setNewAthlete] = useState({
+    name: '',
+    sport: 'Futbol',
+    status: 'Presente' as AttendanceStatus,
+  });
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const presentCount = athleteList.filter((athlete) => athlete.status === 'Presente').length;
+  const attendancePercentage = Math.round((presentCount / athleteList.length) * 100);
+  const teamCount = new Set(athleteList.map((athlete) => athlete.sport)).size;
+  const metrics = [
+    { label: 'Deportistas cargados', value: String(athleteList.length) },
+    { label: 'Asistencia de hoy', value: `${attendancePercentage}%` },
+    { label: 'Deportes activos', value: String(teamCount) },
+  ];
 
   const handleGoogleSuccess = (response: CredentialResponse) => {
     const googleUser = userFromGoogleCredential(response);
@@ -205,6 +215,29 @@ function App({ googleClientIdConfigured }: AppProps) {
       name: 'Entrenador demo',
     });
     setAuthError(null);
+  };
+
+  const handleAthleteSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedName = newAthlete.name.trim();
+    const trimmedSport = newAthlete.sport.trim();
+
+    if (!trimmedName || !trimmedSport) {
+      setSaveMessage('Completa nombre y deporte para cargar el registro.');
+      return;
+    }
+
+    const athlete: Athlete = {
+      id: Date.now(),
+      name: trimmedName,
+      sport: trimmedSport,
+      status: newAthlete.status,
+    };
+
+    setAthleteList((currentAthletes) => [athlete, ...currentAthletes]);
+    setNewAthlete({ name: '', sport: 'Futbol', status: 'Presente' });
+    setSaveMessage(`${trimmedName} fue cargado correctamente.`);
   };
 
   if (!user) {
@@ -228,6 +261,7 @@ function App({ googleClientIdConfigured }: AppProps) {
         </a>
         <div className="nav-links">
           <a href="#asistencia">Asistencia</a>
+          <a href="#carga-datos">Carga</a>
           <a href="#equipos">Equipos</a>
           <a href="#sesiones">Sesiones</a>
         </div>
@@ -259,8 +293,8 @@ function App({ googleClientIdConfigured }: AppProps) {
             <a className="primary-button" href="#asistencia">
               Ver asistencia
             </a>
-            <a className="secondary-button" href="#sesiones">
-              Planificar sesion
+            <a className="secondary-button" href="#carga-datos">
+              Cargar datos
             </a>
           </div>
         </div>
@@ -272,7 +306,7 @@ function App({ googleClientIdConfigured }: AppProps) {
           </div>
           <h2>Lista rapida</h2>
           <div className="athlete-list">
-            {athletes.map((athlete) => (
+            {athleteList.slice(0, 5).map((athlete) => (
               <article className="athlete-row" key={athlete.id}>
                 <div>
                   <strong>{athlete.name}</strong>
@@ -294,6 +328,83 @@ function App({ googleClientIdConfigured }: AppProps) {
             <strong>{metric.value}</strong>
           </article>
         ))}
+      </section>
+
+      <section className="data-entry-panel" id="carga-datos" aria-labelledby="data-entry-title">
+        <div className="section-heading">
+          <p className="eyebrow">Carga de datos</p>
+          <h2 id="data-entry-title">Registrar asistencia de deportistas</h2>
+          <p>
+            Carga un deportista, asignale deporte o equipo y marca su estado para que el
+            tablero se actualice al instante.
+          </p>
+        </div>
+
+        <form className="data-form" onSubmit={handleAthleteSubmit}>
+          <label>
+            Nombre del deportista
+            <input
+              type="text"
+              value={newAthlete.name}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, name: event.target.value }))
+              }
+              placeholder="Ej: Valentina Perez"
+            />
+          </label>
+
+          <label>
+            Deporte o equipo
+            <input
+              type="text"
+              value={newAthlete.sport}
+              onChange={(event) =>
+                setNewAthlete((current) => ({ ...current, sport: event.target.value }))
+              }
+              placeholder="Ej: Futbol Sub 16"
+            />
+          </label>
+
+          <label>
+            Estado
+            <select
+              value={newAthlete.status}
+              onChange={(event) =>
+                setNewAthlete((current) => ({
+                  ...current,
+                  status: event.target.value as AttendanceStatus,
+                }))
+              }
+            >
+              <option value="Presente">Presente</option>
+              <option value="Tarde">Tarde</option>
+              <option value="Ausente">Ausente</option>
+            </select>
+          </label>
+
+          <button className="primary-button form-button" type="submit">
+            Guardar registro
+          </button>
+        </form>
+
+        {saveMessage ? <p className="save-message">{saveMessage}</p> : null}
+
+        <div className="data-table" aria-label="Registros cargados">
+          <div className="data-table-header">
+            <span>Deportista</span>
+            <span>Deporte/equipo</span>
+            <span>Estado</span>
+          </div>
+          {athleteList.map((athlete) => (
+            <article className="data-table-row" key={athlete.id}>
+              <strong>{athlete.name}</strong>
+              <span>{athlete.sport}</span>
+              <span className={`status status-${athlete.status.toLowerCase()}`}>
+                {athlete.status}
+              </span>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="content-grid">
@@ -325,7 +436,7 @@ function App({ googleClientIdConfigured }: AppProps) {
             Esta base deja preparada la experiencia principal: registrar asistencia,
             visualizar indicadores y ordenar entrenamientos por deporte o equipo.
           </p>
-          <a className="secondary-button light" href="#asistencia">
+          <a className="secondary-button light" href="#carga-datos">
             Empezar carga
           </a>
         </div>

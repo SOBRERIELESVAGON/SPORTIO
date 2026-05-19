@@ -7,6 +7,7 @@ App de asistencia a entrenamientos deportivos multi-deporte.
 - Login con Google configurable por entorno.
 - Landing inicial para presentar Sportia.
 - Resumen de asistencia de un entrenamiento.
+- Modulo de carga de deportistas con deporte/equipo y estado de asistencia.
 - Indicadores principales de deportistas, equipos y asistencia.
 - Agenda de proximas sesiones por equipo/deporte.
 
