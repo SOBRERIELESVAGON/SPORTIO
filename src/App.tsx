@@ -1307,6 +1307,10 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     [tenantAthleteList, preferredSport],
   );
   const presentCount = athletesForView.filter((athlete) => athlete.status === 'Presente').length;
+  const absentAthletesForQuickList = useMemo(
+    () => athletesForView.filter((athlete) => athlete.status === 'Ausente'),
+    [athletesForView],
+  );
   const isPrivilegedUser = userRole === 'Staff' || userRole === 'Coordinación' || userRole === 'Master';
   const canImportPlayers = userRole === 'Staff' || userRole === 'Coordinación';
   const isMasterUser = userRole === 'Master';
@@ -2150,17 +2154,23 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
             </div>
             <h2>{t('hero.quickList')}</h2>
             <div className="athlete-list">
-              {athletesForView.slice(0, 5).map((athlete) => (
-                <article className="athlete-row" key={athlete.id}>
-                  <div>
-                    <strong>{getAthleteFullName(athlete)}</strong>
-                    <span>{athlete.sport} · DNI {athlete.dni}</span>
-                  </div>
-                  <span className={`status status-${athlete.status.toLowerCase()}`}>
-                    {translateAttendanceStatus(selectedLanguage, athlete.status)}
-                  </span>
-                </article>
-              ))}
+              {absentAthletesForQuickList.length > 0 ? (
+                absentAthletesForQuickList.slice(0, 5).map((athlete) => (
+                  <article className="athlete-row" key={athlete.id}>
+                    <div>
+                      <strong>{getAthleteFullName(athlete)}</strong>
+                      <span>{athlete.sport} · DNI {athlete.dni}</span>
+                    </div>
+                    <span className={`status status-${athlete.status.toLowerCase()}`}>
+                      {translateAttendanceStatus(selectedLanguage, athlete.status)}
+                    </span>
+                  </article>
+                ))
+              ) : (
+                <p className="athlete-list-empty">
+                  {selectedLanguage === 'es' ? 'Sin ausentes.' : 'No absentees.'}
+                </p>
+              )}
             </div>
           </aside>
         ) : (

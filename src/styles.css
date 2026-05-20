@@ -576,6 +576,16 @@ button {
   color: #667b6f;
 }
 
+.athlete-list-empty {
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed #dce8e1;
+  border-radius: 20px;
+  color: #667b6f;
+  background: #fbfdfc;
+  font-weight: 800;
+}
+
 .status {
   flex: 0 0 auto;
   padding: 8px 10px;
