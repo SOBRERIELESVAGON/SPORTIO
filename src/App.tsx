@@ -2186,7 +2186,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           <h2>{t('banner.title')}</h2>
           <p>{t('banner.desc')}</p>
         </div>
-        <span>{t('banner.owner')}</span>
       </section>
 
       <AdSlot
