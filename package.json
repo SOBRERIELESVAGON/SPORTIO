@@ -22,8 +22,11 @@
   },
   "homepage": "https://github.com/SOBRERIELESVAGON/SPORTIO#readme",
   "dependencies": {
+    "@react-oauth/google": "^0.13.5",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "tesseract.js": "^7.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
