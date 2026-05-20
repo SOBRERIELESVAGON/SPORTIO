@@ -79,12 +79,21 @@ button {
 
 .login-hero-tagline {
   max-width: 90%;
-  margin: 0 0 3cm;
+  margin: 0 0 18px;
   color: rgba(255, 255, 255, 0.92);
   font-size: 3.75rem;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.02em;
+}
+
+.login-hero-tagline-en {
+  max-width: 80%;
+  margin: 0 0 3cm;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .login-card {
@@ -174,6 +183,27 @@ button {
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 20px 60px rgba(16, 32, 23, 0.08);
   backdrop-filter: blur(18px);
+}
+
+.order-ready-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: baseline;
+  width: fit-content;
+  margin: 18px auto 0;
+  padding: 10px 16px;
+  border: 1px solid rgba(15, 122, 63, 0.18);
+  border-radius: 999px;
+  color: #0f3d2b;
+  background: #dcfce7;
+  box-shadow: 0 14px 34px rgba(15, 122, 63, 0.12);
+}
+
+.order-ready-banner span {
+  color: #3d5b49;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .brand,
@@ -1659,9 +1689,14 @@ button {
   }
 
   .login-hero-tagline {
-    margin-bottom: 3cm;
+    margin-bottom: 16px;
     font-size: 2.85rem;
     line-height: 1.3;
+  }
+
+  .login-hero-tagline-en {
+    margin-bottom: 2cm;
+    font-size: 1rem;
   }
 
   .topbar {

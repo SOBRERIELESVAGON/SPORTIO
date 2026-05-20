@@ -647,6 +647,39 @@ const initialAthletes: Athlete[] = ([
   },
   {
     id: 3,
+    memberNumber: '4618',
+    lastName: 'GIMENEZ',
+    firstName: 'VALENTINA',
+    dni: '53.118.904',
+    address: 'España 1550, Salta',
+    birthDate: '18/03/2011',
+    age: '14',
+    playerPhone: '3875558800',
+    fatherPhone: '3875558801',
+    motherPhone: '3875558802',
+    email: 'valentina.gimenez@example.com',
+    healthInsurance: 'Sancor Salud',
+    healthInsuranceNumber: 'SS-53118904',
+    paymentMethod: 'Transferencia',
+    memberStatus: 'Activo',
+    membershipType: 'Jugadora juvenil',
+    nextBillingDate: '30/04/2026',
+    sport: 'Fútbol',
+    team: 'Fútbol Sub 14',
+    cohort: 'Camada 2011',
+    perfectAttendance30Days: false,
+    trainingsAttended: 10,
+    trainingsTotal: 12,
+    matchesAttended: 2,
+    matchesTotal: 4,
+    toursAttended: 0,
+    toursTotal: 1,
+    stayedAsGuest: false,
+    hostedGuest: false,
+    status: 'Presente',
+  },
+  {
+    id: 4,
     memberNumber: '4615',
     lastName: 'ROJAS',
     firstName: 'MATEO',
@@ -679,7 +712,7 @@ const initialAthletes: Athlete[] = ([
     status: 'Presente',
   },
   {
-    id: 4,
+    id: 5,
     memberNumber: '4616',
     lastName: 'ARIAS',
     firstName: 'SOFIA',
@@ -712,7 +745,7 @@ const initialAthletes: Athlete[] = ([
     status: 'Presente',
   },
   {
-    id: 5,
+    id: 6,
     memberNumber: '4617',
     lastName: 'FERRERO',
     firstName: 'TOMAS',
@@ -856,6 +889,9 @@ function LoginScreen({
           <span>{t('common.brandName')}</span>
         </a>
         <p className="login-hero-tagline">{t('login.heroTagline')}</p>
+        <p className="login-hero-tagline-en">
+          Free sports attendance tracking app available in multiple languages.
+        </p>
       </section>
 
       <section className="login-card" aria-labelledby="login-title">
@@ -1884,6 +1920,11 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           </button>
         </div>
       </nav>
+
+      <section className="order-ready-banner" aria-live="polite">
+        <strong>Última orden lista</strong>
+        <span>Latest request ready</span>
+      </section>
 
       <section className="hero" id="inicio">
         <div className="hero-copy">
