@@ -154,7 +154,7 @@ const adSlots: {
     placement: 'hero',
     titleKey: 'ad.hero.title',
     placementKey: 'ad.hero.placement',
-    size: '970 x 250',
+    size: '970 x 250 / 320 x 100',
   },
   {
     id: 'sidebar-ad',
@@ -540,7 +540,7 @@ function AdSlot({
 
   return (
     <aside
-      className={`ad-slot ${showsGoogleAd ? 'ad-slot-live' : ''}`}
+      className={`ad-slot ad-slot-${googlePlacement} ${showsGoogleAd ? 'ad-slot-live' : ''}`}
       aria-label={title}
     >
       {showsGoogleAd ? (
@@ -1905,15 +1905,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
             </a>
           </aside>
         )}
-      </section>
-
-      <section className="free-access-banner" aria-label={t('banner.aria')}>
-        <div>
-          <p className="eyebrow">{t('banner.eyebrow')}</p>
-          <h2>{t('banner.title')}</h2>
-          <p>{t('banner.desc')}</p>
-        </div>
-        <span>{t('banner.owner')}</span>
       </section>
 
       <AdSlot
