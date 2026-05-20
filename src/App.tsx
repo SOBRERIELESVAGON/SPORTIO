@@ -29,6 +29,12 @@ import {
   recognizePlayerFromImage,
   type PlayerImportData,
 } from './playerImport';
+import {
+  DEFAULT_ORGANIZATION_ID,
+  assertSameOrganization,
+  filterByOrganizationId,
+  type OrganizationId,
+} from './tenantAccess';
 
 type AttendanceStatus = 'Presente' | 'Ausente';
 type AttendanceActivity = 'Entrenamiento' | 'Partido';
@@ -46,6 +52,7 @@ type ReportScope = 'General' | 'División' | 'Equipo' | 'Camada' | 'Individual';
 
 type Athlete = {
   id: number;
+  organizationId: OrganizationId;
   memberNumber: string;
   lastName: string;
   firstName: string;
@@ -89,6 +96,7 @@ type GoogleJwtPayload = {
 type AuthenticatedUser = {
   email: string;
   name: string;
+  organizationId: OrganizationId;
   picture?: string;
 };
 
@@ -377,9 +385,14 @@ function numberFromForm(value: string) {
   return Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
 }
 
-function athleteFromImportData(data: PlayerImportData, id: number): Athlete {
+function athleteFromImportData(
+  data: PlayerImportData,
+  id: number,
+  organizationId: OrganizationId,
+): Athlete {
   return {
     id,
+    organizationId,
     memberNumber: data.memberNumber.trim(),
     lastName: data.lastName.trim().toUpperCase(),
     firstName: data.firstName.trim().toUpperCase(),
@@ -565,7 +578,7 @@ function AdSlot({
   );
 }
 
-const initialAthletes: Athlete[] = [
+const initialAthletes: Athlete[] = ([
   {
     id: 1,
     memberNumber: '4613',
@@ -731,7 +744,10 @@ const initialAthletes: Athlete[] = [
     hostedGuest: true,
     status: 'Presente',
   },
-];
+] satisfies Omit<Athlete, 'organizationId'>[]).map((athlete) => ({
+  ...athlete,
+  organizationId: DEFAULT_ORGANIZATION_ID,
+}));
 
 function decodeGoogleCredential(credential: string): GoogleJwtPayload | null {
   const [, payload] = credential.split('.');
@@ -770,6 +786,7 @@ function userFromGoogleCredential(response: CredentialResponse): AuthenticatedUs
   return {
     email: payload.email,
     name: payload.name ?? payload.given_name ?? payload.email,
+    organizationId: DEFAULT_ORGANIZATION_ID,
     picture: payload.picture,
   };
 }
@@ -974,6 +991,7 @@ function LoginScreen({
 
 function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const currentOrganizationId = user?.organizationId ?? DEFAULT_ORGANIZATION_ID;
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(() => {
     const storedLanguage = readStoredValue(languageKey);
 
@@ -1052,20 +1070,30 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [reportSport, setReportSport] = useState(preferredSport);
   const [reportScope, setReportScope] = useState<ReportScope>('General');
   const [reportTarget, setReportTarget] = useState(() =>
-    getReportGroupOptions(athleteList, 'General', preferredSport, {
-      wholeInstitution: 'Toda la institución',
-      noAthletes: 'Sin deportistas cargados',
-    })[0],
+    getReportGroupOptions(
+      filterByOrganizationId(athleteList, currentOrganizationId),
+      'General',
+      preferredSport,
+      {
+        wholeInstitution: 'Toda la institución',
+        noAthletes: 'Sin deportistas cargados',
+      },
+    )[0],
+  );
+  const tenantAthleteList = useMemo(
+    () => filterByOrganizationId(athleteList, currentOrganizationId),
+    [athleteList, currentOrganizationId],
   );
   const athletesForView = useMemo(
-    () => athleteList.filter((athlete) => athlete.sport === preferredSport),
-    [athleteList, preferredSport],
+    () => tenantAthleteList.filter((athlete) => athlete.sport === preferredSport),
+    [tenantAthleteList, preferredSport],
   );
   const presentCount = athletesForView.filter((athlete) => athlete.status === 'Presente').length;
   const isPrivilegedUser = userRole === 'Staff' || userRole === 'Coordinación' || userRole === 'Master';
   const canImportPlayers = userRole === 'Staff' || userRole === 'Coordinación';
   const isMasterUser = userRole === 'Master';
-  const selectedPlayer = athleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
+  const selectedPlayer =
+    tenantAthleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
   const attendancePercentage =
     athletesForView.length > 0
       ? Math.round((presentCount / athletesForView.length) * 100)
@@ -1078,8 +1106,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     [t],
   );
   const athletesForReportSport = useMemo(
-    () => filterAthletesBySport(athleteList, reportSport),
-    [athleteList, reportSport],
+    () => filterAthletesBySport(tenantAthleteList, reportSport),
+    [tenantAthleteList, reportSport],
   );
   const reportTargetOptions = useMemo(
     () => getReportGroupOptions(athletesForReportSport, reportScope, reportSport, reportLabels),
@@ -1111,8 +1139,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [rankingSport, setRankingSport] = useState(preferredSport);
   const [rankingScope, setRankingScope] = useState<(typeof rankingScopes)[number]>('Camada');
   const rankingCandidates = useMemo(
-    () => filterAthletesBySport(athleteList, rankingSport),
-    [athleteList, rankingSport],
+    () => filterAthletesBySport(tenantAthleteList, rankingSport),
+    [tenantAthleteList, rankingSport],
   );
   const rankingGroupOptions = Array.from(
     new Set(
@@ -1209,6 +1237,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setUser({
       email: `${role.toLowerCase()}@sportia.app`,
       name: role,
+      organizationId: currentOrganizationId,
     });
     setUserRole(role);
     setSelectedPlayerId(null);
@@ -1222,7 +1251,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setRankingSport(sport);
     setNewAthlete((currentAthlete) => ({ ...currentAthlete, sport }));
 
-    const athletesInSport = filterAthletesBySport(athleteList, sport);
+    const athletesInSport = filterAthletesBySport(tenantAthleteList, sport);
     const nextTargetOptions = getReportGroupOptions(
       athletesInSport,
       reportScope,
@@ -1234,7 +1263,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   };
 
   const handlePlayerAccess = (athleteId: number) => {
-    const athlete = athleteList.find((currentAthlete) => currentAthlete.id === athleteId);
+    const athlete = tenantAthleteList.find((currentAthlete) => currentAthlete.id === athleteId);
 
     if (!athlete) {
       setAuthError(t('auth.playerNotFound'));
@@ -1244,6 +1273,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setUser({
       email: athlete.email || `${athlete.memberNumber || athlete.id}@sportia.app`,
       name: getAthleteFullName(athlete),
+      organizationId: athlete.organizationId,
     });
     setUserRole('Jugador');
     setSelectedPlayerId(athlete.id);
@@ -1265,6 +1295,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
 
     const athlete: Athlete = {
       id: Date.now(),
+      organizationId: currentOrganizationId,
       memberNumber: newAthlete.memberNumber.trim(),
       lastName: trimmedLastName.toUpperCase(),
       firstName: trimmedFirstName.toUpperCase(),
@@ -1342,7 +1373,9 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     const baseId = Date.now();
 
     setAthleteList((currentAthletes) => [
-      ...players.map((player, index) => athleteFromImportData(player, baseId + index)),
+      ...players.map((player, index) =>
+        athleteFromImportData(player, baseId + index, currentOrganizationId),
+      ),
       ...currentAthletes,
     ]);
   };
@@ -1562,7 +1595,9 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const updateAthlete = (athleteId: number, updates: Partial<Athlete>) => {
     setAthleteList((currentAthletes) =>
       currentAthletes.map((athlete) =>
-        athlete.id === athleteId ? { ...athlete, ...updates } : athlete,
+        athlete.id === athleteId && athlete.organizationId === currentOrganizationId
+          ? { ...athlete, ...updates, organizationId: currentOrganizationId }
+          : athlete,
       ),
     );
   };
@@ -1581,7 +1616,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       return;
     }
 
-    const removedAthletes = athleteList.filter((athlete) => uniqueIds.includes(athlete.id));
+    const removedAthletes = tenantAthleteList.filter((athlete) => uniqueIds.includes(athlete.id));
 
     if (removedAthletes.length === 0) {
       return;
@@ -1589,7 +1624,10 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
 
     setAthleteUndoStack((currentStack) => [...currentStack.slice(-19), removedAthletes]);
     setAthleteList((currentAthletes) =>
-      currentAthletes.filter((athlete) => !uniqueIds.includes(athlete.id)),
+      currentAthletes.filter(
+        (athlete) =>
+          athlete.organizationId !== currentOrganizationId || !uniqueIds.includes(athlete.id),
+      ),
     );
     setSelectedDeleteIds((currentIds) => currentIds.filter((id) => !uniqueIds.includes(id)));
 
@@ -1660,7 +1698,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     }
 
     const lastBatch = athleteUndoStack[athleteUndoStack.length - 1];
-    const existingIds = new Set(athleteList.map((athlete) => athlete.id));
+    const existingIds = new Set(tenantAthleteList.map((athlete) => athlete.id));
     const athletesToRestore = lastBatch.filter((athlete) => !existingIds.has(athlete.id));
 
     if (athletesToRestore.length > 0) {
@@ -1674,7 +1712,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const markAllAttendancePresent = () => {
     setAthleteList((currentAthletes) =>
       currentAthletes.map((athlete) => {
-        if (athlete.sport !== preferredSport) {
+        if (athlete.organizationId !== currentOrganizationId || athlete.sport !== preferredSport) {
           return athlete;
         }
 
@@ -1702,6 +1740,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   };
 
   const updateActivityAttendance = (athlete: Athlete, status: AttendanceStatus) => {
+    assertSameOrganization(athlete, currentOrganizationId);
     const isPresent = status === 'Presente';
 
     if (attendanceActivity === 'Entrenamiento') {
@@ -1725,6 +1764,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   };
 
   const updateTourAttendance = (athlete: Athlete, isPresent: boolean) => {
+    assertSameOrganization(athlete, currentOrganizationId);
     const toursTotal = Math.max(athlete.toursTotal, 1);
 
     updateAthlete(athlete.id, {
@@ -1736,7 +1776,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const markAllToursPresent = () => {
     setAthleteList((currentAthletes) =>
       currentAthletes.map((athlete) => {
-        if (athlete.sport !== preferredSport) {
+        if (athlete.organizationId !== currentOrganizationId || athlete.sport !== preferredSport) {
           return athlete;
         }
 
@@ -1752,7 +1792,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   };
 
   const handleReportScopeChange = (scope: ReportScope) => {
-    const athletesInSport = filterAthletesBySport(athleteList, reportSport);
+    const athletesInSport = filterAthletesBySport(tenantAthleteList, reportSport);
     const nextTargetOptions = getReportGroupOptions(
       athletesInSport,
       scope,
@@ -1765,7 +1805,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   };
 
   const handleReportSportChange = (sport: string) => {
-    const athletesInSport = filterAthletesBySport(athleteList, sport);
+    const athletesInSport = filterAthletesBySport(tenantAthleteList, sport);
     const nextTargetOptions = getReportGroupOptions(
       athletesInSport,
       reportScope,
