@@ -255,6 +255,7 @@ button {
 }
 
 .language-selector,
+.organization-selector,
 .sport-preference-selector {
   display: grid;
   gap: 2px;
@@ -265,6 +266,8 @@ button {
 }
 
 .language-selector select,
+.organization-selector select,
+.organization-create-form input,
 .sport-preference-selector select {
   min-height: 32px;
   border: 1px solid #dce8e1;
@@ -278,6 +281,34 @@ button {
   text-transform: none;
 }
 
+.organization-selector label {
+  display: grid;
+  gap: 2px;
+}
+
+.organization-create-toggle,
+.organization-create-form button {
+  border: 0;
+  padding: 0;
+  color: #0f7a3f;
+  background: transparent;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-align: left;
+  cursor: pointer;
+  text-transform: none;
+}
+
+.organization-create-form {
+  display: grid;
+  gap: 6px;
+}
+
+.organization-create-form input {
+  width: 100%;
+  padding: 0 10px;
+}
+
 .login-language-row {
   display: flex;
   gap: 12px;
@@ -286,11 +317,14 @@ button {
 }
 
 .login-language-row .language-selector,
+.login-language-row .organization-selector,
 .login-language-row .sport-preference-selector {
   width: min(220px, 100%);
 }
 
 .login-language-row .language-selector select,
+.login-language-row .organization-selector select,
+.login-language-row .organization-create-form input,
 .login-language-row .sport-preference-selector select {
   min-height: 42px;
   border-radius: 14px;
@@ -660,6 +694,28 @@ button {
   margin: 0;
   color: #667b6f;
   font-weight: 800;
+}
+
+.ad-slot-contact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+.ad-whatsapp-link {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: #128c7e;
+  font-weight: 900;
+}
+
+.ad-whatsapp-link svg {
+  width: 16px;
+  height: 16px;
+  fill: #25d366;
 }
 
 .ad-slot-live {

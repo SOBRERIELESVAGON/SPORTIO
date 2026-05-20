@@ -142,6 +142,8 @@ const ALL_SPORTS_VALUE = '__all_sports__';
 const rememberedRoleKey = 'sportia.rememberedRole';
 const rememberedPasswordKey = 'sportia.rememberedPassword';
 const preferredSportKey = 'sportia.preferredSport';
+const organizationOptionsKey = 'sportia.organizations';
+const preferredOrganizationKey = 'sportia.preferredOrganization';
 const protectedRoles: ProtectedRole[] = ['Staff', 'Coordinación', 'Master'];
 const rolePasswords: Record<ProtectedRole, string> = {
   Staff: 'staff2026',
@@ -178,6 +180,17 @@ const adSlots: {
     placementKey: 'ad.footer.placement',
     size: '728 x 90',
   },
+];
+const advertisingWhatsAppNumber = '5493875313231';
+const advertisingWhatsAppUrl = `https://wa.me/${advertisingWhatsAppNumber}`;
+
+type OrganizationOption = {
+  id: OrganizationId;
+  name: string;
+};
+
+const defaultOrganizationOptions: OrganizationOption[] = [
+  { id: DEFAULT_ORGANIZATION_ID, name: 'Sportia Demo Club' },
 ];
 
 const reportPeriods: ReportPeriod[] = [
@@ -485,6 +498,41 @@ function removeStoredValue(key: string) {
   }
 }
 
+function readStoredOrganizations() {
+  const storedOrganizations = readStoredValue(organizationOptionsKey);
+
+  if (!storedOrganizations) {
+    return defaultOrganizationOptions;
+  }
+
+  try {
+    const parsedOrganizations = JSON.parse(storedOrganizations) as OrganizationOption[];
+    const validOrganizations = parsedOrganizations.filter(
+      (organization) => organization.id && organization.name.trim(),
+    );
+
+    return validOrganizations.length > 0 ? validOrganizations : defaultOrganizationOptions;
+  } catch {
+    return defaultOrganizationOptions;
+  }
+}
+
+function writeStoredOrganizations(organizations: OrganizationOption[]) {
+  writeStoredValue(organizationOptionsKey, JSON.stringify(organizations));
+}
+
+function createOrganizationId(name: string) {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return `club-${slug || 'institucion'}-${Date.now()}`;
+}
+
 function LanguageSelector({
   selectedLanguage,
   onLanguageChange,
@@ -508,6 +556,72 @@ function LanguageSelector({
         ))}
       </select>
     </label>
+  );
+}
+
+function OrganizationSelector({
+  organizations,
+  selectedOrganizationId,
+  onOrganizationChange,
+  onOrganizationCreate,
+}: {
+  organizations: OrganizationOption[];
+  selectedOrganizationId: OrganizationId;
+  onOrganizationChange: (organizationId: OrganizationId) => void;
+  onOrganizationCreate: (organizationName: string) => void;
+}) {
+  const [newOrganizationName, setNewOrganizationName] = useState('');
+  const [isCreatingOrganization, setIsCreatingOrganization] = useState(false);
+
+  const handleCreateOrganization = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedName = newOrganizationName.trim();
+
+    if (!trimmedName) {
+      return;
+    }
+
+    onOrganizationCreate(trimmedName);
+    setNewOrganizationName('');
+    setIsCreatingOrganization(false);
+  };
+
+  return (
+    <div className="organization-selector">
+      <label>
+        Club / Institución
+        <select
+          value={selectedOrganizationId}
+          onChange={(event) => onOrganizationChange(event.target.value)}
+        >
+          {organizations.map((organization) => (
+            <option value={organization.id} key={organization.id}>
+              {organization.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {isCreatingOrganization ? (
+        <form className="organization-create-form" onSubmit={handleCreateOrganization}>
+          <input
+            type="text"
+            value={newOrganizationName}
+            onChange={(event) => setNewOrganizationName(event.target.value)}
+            placeholder="Nombre del club o institución"
+            autoFocus
+          />
+          <button type="submit">Agregar</button>
+        </form>
+      ) : (
+        <button
+          className="organization-create-toggle"
+          type="button"
+          onClick={() => setIsCreatingOrganization(true)}
+        >
+          No está mi club / Cargar institución
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -570,7 +684,21 @@ function AdSlot({
           {showsPendingGoogle ? (
             <small>{t('ad.googlePending')}</small>
           ) : (
-            <small>{t('ad.administered', { size })}</small>
+            <small className="ad-slot-contact">
+              <span>{size}</span>
+              <a
+                className="ad-whatsapp-link"
+                href={advertisingWhatsAppUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Consultar publicidad por WhatsApp al +54 9 387 531 3231"
+              >
+                <svg aria-hidden="true" viewBox="0 0 32 32" focusable="false">
+                  <path d="M16 3.2A12.7 12.7 0 0 0 5.1 22.4L3.6 28.8l6.5-1.7A12.8 12.8 0 1 0 16 3.2Zm0 22.9a10.1 10.1 0 0 1-5.2-1.4l-.4-.3-3.8 1 1-3.7-.2-.4A10.1 10.1 0 1 1 16 26.1Zm5.6-7.6c-.3-.2-1.8-.9-2.1-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6c.2-.2.2-.3.3-.5.1-.2.1-.4 0-.6 0-.2-.7-1.7-1-2.3-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.2-1.2 2.9 0 1.7 1.3 3.4 1.5 3.6.2.2 2.5 3.8 6 5.3.8.4 1.5.6 2 .7.8.3 1.6.2 2.2.1.7-.1 1.8-.8 2.1-1.5.3-.7.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4Z" />
+                </svg>
+                Consultar +54 9 387 531 3231
+              </a>
+            </small>
           )}
         </>
       )}
@@ -832,8 +960,12 @@ function LoginScreen({
   onStaffAccess,
   onGoogleError,
   onLanguageChange,
+  onOrganizationChange,
+  onOrganizationCreate,
   onPreferredSportChange,
+  organizations,
   preferredSport,
+  selectedOrganizationId,
   selectedLanguage,
   t,
 }: {
@@ -844,8 +976,12 @@ function LoginScreen({
   onStaffAccess: (role: ProtectedRole, password: string, rememberPassword: boolean) => void;
   onGoogleError: () => void;
   onLanguageChange: (language: LanguageCode) => void;
+  onOrganizationChange: (organizationId: OrganizationId) => void;
+  onOrganizationCreate: (organizationName: string) => void;
   onPreferredSportChange: (sport: string) => void;
+  organizations: OrganizationOption[];
   preferredSport: string;
+  selectedOrganizationId: OrganizationId;
   selectedLanguage: LanguageCode;
   t: Translator;
 }) {
@@ -900,6 +1036,12 @@ function LoginScreen({
             selectedLanguage={selectedLanguage}
             onLanguageChange={onLanguageChange}
             t={t}
+          />
+          <OrganizationSelector
+            organizations={organizations}
+            selectedOrganizationId={selectedOrganizationId}
+            onOrganizationChange={onOrganizationChange}
+            onOrganizationCreate={onOrganizationCreate}
           />
           <SportPreferenceSelector
             selectedSport={preferredSport}
@@ -1027,7 +1169,18 @@ function LoginScreen({
 
 function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
-  const currentOrganizationId = user?.organizationId ?? DEFAULT_ORGANIZATION_ID;
+  const [organizations, setOrganizations] = useState<OrganizationOption[]>(() =>
+    readStoredOrganizations(),
+  );
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<OrganizationId>(() => {
+    const storedOrganizationId = readStoredValue(preferredOrganizationKey);
+    const storedOrganizations = readStoredOrganizations();
+
+    return storedOrganizations.some((organization) => organization.id === storedOrganizationId)
+      ? (storedOrganizationId as OrganizationId)
+      : DEFAULT_ORGANIZATION_ID;
+  });
+  const currentOrganizationId = user?.organizationId ?? selectedOrganizationId;
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(() => {
     const storedLanguage = readStoredValue(languageKey);
 
@@ -1042,6 +1195,35 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const handleLanguageChange = (language: LanguageCode) => {
     setSelectedLanguage(language);
     writeStoredValue(languageKey, language);
+  };
+
+  const handleOrganizationChange = (organizationId: OrganizationId) => {
+    setSelectedOrganizationId(organizationId);
+    writeStoredValue(preferredOrganizationKey, organizationId);
+    setUser((currentUser) =>
+      currentUser ? { ...currentUser, organizationId } : currentUser,
+    );
+    setSelectedPlayerId(null);
+    setSelectedDeleteIds([]);
+    setAthleteUndoStack([]);
+  };
+
+  const handleOrganizationCreate = (organizationName: string) => {
+    const trimmedName = organizationName.trim();
+
+    if (!trimmedName) {
+      return;
+    }
+
+    const organization: OrganizationOption = {
+      id: createOrganizationId(trimmedName),
+      name: trimmedName,
+    };
+    const nextOrganizations = [...organizations, organization];
+
+    setOrganizations(nextOrganizations);
+    writeStoredOrganizations(nextOrganizations);
+    handleOrganizationChange(organization.id);
   };
 
   const [preferredSport, setPreferredSport] = useState(() => {
@@ -1861,11 +2043,15 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         googleClientIdConfigured={googleClientIdConfigured}
         onGoogleError={() => setAuthError(t('auth.googleError'))}
         onLanguageChange={handleLanguageChange}
+        onOrganizationChange={handleOrganizationChange}
+        onOrganizationCreate={handleOrganizationCreate}
         t={t}
         onPreferredSportChange={handlePreferredSportChange}
         onPlayerAccess={handlePlayerAccess}
         onStaffAccess={handleStaffAccess}
+        organizations={organizations}
         preferredSport={preferredSport}
+        selectedOrganizationId={currentOrganizationId}
         selectedLanguage={selectedLanguage}
       />
     );
@@ -1892,6 +2078,12 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
             selectedLanguage={selectedLanguage}
             onLanguageChange={handleLanguageChange}
             t={t}
+          />
+          <OrganizationSelector
+            organizations={organizations}
+            selectedOrganizationId={currentOrganizationId}
+            onOrganizationChange={handleOrganizationChange}
+            onOrganizationCreate={handleOrganizationCreate}
           />
           <SportPreferenceSelector
             selectedSport={preferredSport}
