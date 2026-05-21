@@ -26,7 +26,6 @@ import {
 import {
   downloadPlayerImportTemplate,
   parseSpreadsheetFile,
-  recognizePlayerFromImage,
   type PlayerImportData,
 } from './playerImport';
 
@@ -314,41 +313,6 @@ function athleteFromImportData(data: PlayerImportData, id: number): Athlete {
     matchesTotal: data.matchesTotal,
     toursAttended: data.toursAttended,
     toursTotal: data.toursTotal,
-    stayedAsGuest: data.stayedAsGuest,
-    hostedGuest: data.hostedGuest,
-    status: data.status,
-  };
-}
-
-function importDataToFormState(data: PlayerImportData, preferredSport: string) {
-  return {
-    memberNumber: data.memberNumber,
-    lastName: data.lastName,
-    firstName: data.firstName,
-    dni: data.dni,
-    address: data.address,
-    birthDate: data.birthDate,
-    age: data.age,
-    playerPhone: data.playerPhone,
-    fatherPhone: data.fatherPhone,
-    motherPhone: data.motherPhone,
-    email: data.email,
-    healthInsurance: data.healthInsurance,
-    healthInsuranceNumber: data.healthInsuranceNumber,
-    paymentMethod: data.paymentMethod,
-    memberStatus: data.memberStatus,
-    membershipType: data.membershipType,
-    nextBillingDate: data.nextBillingDate,
-    sport: data.sport || preferredSport,
-    team: data.team,
-    cohort: data.cohort,
-    perfectAttendance30Days: data.perfectAttendance30Days,
-    trainingsAttended: String(data.trainingsAttended),
-    trainingsTotal: String(data.trainingsTotal),
-    matchesAttended: String(data.matchesAttended),
-    matchesTotal: String(data.matchesTotal),
-    toursAttended: String(data.toursAttended),
-    toursTotal: String(data.toursTotal),
     stayedAsGuest: data.stayedAsGuest,
     hostedGuest: data.hostedGuest,
     status: data.status,
@@ -906,12 +870,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   });
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [importLoading, setImportLoading] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
   const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const spreadsheetInputRef = useRef<HTMLInputElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const playersTableRef = useRef<HTMLDivElement>(null);
   const [spreadsheetFileName, setSpreadsheetFileName] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>(
@@ -1164,19 +1124,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     ]);
   };
 
-  const clearPhotoSelection = () => {
-    if (photoPreviewUrl) {
-      URL.revokeObjectURL(photoPreviewUrl);
-    }
-
-    setPhotoPreviewUrl(null);
-    setPhotoFile(null);
-
-    if (photoInputRef.current) {
-      photoInputRef.current.value = '';
-    }
-  };
-
   const scrollToPlayersTable = () => {
     window.setTimeout(() => {
       playersTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1231,68 +1178,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     } finally {
       setImportLoading(false);
       event.target.value = '';
-    }
-  };
-
-  const handlePhotoSelect = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    if (photoPreviewUrl) {
-      URL.revokeObjectURL(photoPreviewUrl);
-    }
-
-    setPhotoFile(file);
-    setPhotoPreviewUrl(URL.createObjectURL(file));
-    setImportMessage(null);
-  };
-
-  const handlePhotoImport = async () => {
-    if (!photoFile) {
-      setImportMessage(t('import.selectPhoto'));
-      return;
-    }
-
-    setImportLoading(true);
-    setImportProgress(0);
-    setImportMessage(null);
-
-    try {
-      const extracted = await recognizePlayerFromImage(
-        photoFile,
-        preferredSport,
-        setImportProgress,
-      );
-
-      if (
-        !extracted.lastName.trim() ||
-        !extracted.firstName.trim() ||
-        !extracted.dni.trim()
-      ) {
-        setNewAthlete((current) => ({
-          ...current,
-          ...importDataToFormState(extracted, preferredSport),
-        }));
-        setImportMessage(t('import.partial'));
-        return;
-      }
-
-      addImportedPlayers([extracted]);
-      setImportMessage(
-        t('import.fromPhoto', {
-          name: `${extracted.lastName.toUpperCase()} ${extracted.firstName.toUpperCase()}`,
-        }),
-      );
-      clearPhotoSelection();
-      setSaveMessage(null);
-    } catch {
-      setImportMessage(t('import.photoError'));
-    } finally {
-      setImportLoading(false);
-      setImportProgress(0);
     }
   };
 
@@ -2065,46 +1950,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                 ) : null}
               </article>
 
-              <article className="import-card">
-                <strong>{t('import.photoTitle')}</strong>
-                <p>
-                  {t('import.photoDesc')}
-                </p>
-                <div className="import-buttons">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={importLoading}
-                    onClick={() => photoInputRef.current?.click()}
-                  >
-                    {t('import.choosePhoto')}
-                  </button>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    disabled={importLoading || !photoFile}
-                    onClick={handlePhotoImport}
-                  >
-                    {importLoading && photoFile
-                      ? t('import.readingPhoto', { progress: importProgress })
-                      : t('import.extractPhoto')}
-                  </button>
-                </div>
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  hidden
-                  onChange={handlePhotoSelect}
-                />
-                {photoPreviewUrl ? (
-                  <figure className="import-photo-preview">
-                    <img src={photoPreviewUrl} alt={t('import.previewAlt')} />
-                    <figcaption>{t('import.previewCaption')}</figcaption>
-                  </figure>
-                ) : null}
-              </article>
             </div>
 
             {importMessage ? (
