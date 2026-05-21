@@ -276,6 +276,29 @@ function getAthleteFullName(athlete: Athlete) {
   return `${athlete.lastName} ${athlete.firstName}`.trim();
 }
 
+function normalizeDuplicateKeyPart(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function getAthleteDuplicateKey(athlete: Pick<Athlete, 'dni' | 'lastName' | 'firstName' | 'sport'>) {
+  const normalizedDni = normalizeDuplicateKeyPart(athlete.dni);
+
+  if (normalizedDni) {
+    return `dni:${normalizedDni}`;
+  }
+
+  return [
+    'name',
+    normalizeDuplicateKeyPart(athlete.lastName),
+    normalizeDuplicateKeyPart(athlete.firstName),
+    normalizeDuplicateKeyPart(athlete.sport),
+  ].join(':');
+}
+
 function filterAthletesBySport(athletes: Athlete[], sport: string) {
   return sport === ALL_SPORTS_VALUE ? athletes : athletes.filter((athlete) => athlete.sport === sport);
 }
@@ -1640,6 +1663,17 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       status: newAthlete.status,
     };
 
+    const duplicateExists = tenantAthleteList.some(
+      (currentAthlete) => getAthleteDuplicateKey(currentAthlete) === getAthleteDuplicateKey(athlete),
+    );
+
+    if (duplicateExists) {
+      setSaveMessage(
+        `El jugador ${trimmedLastName.toUpperCase()} ${trimmedFirstName.toUpperCase()} ya existe. Se mantiene el registro anterior.`,
+      );
+      return;
+    }
+
     setAthleteList((currentAthletes) => [athlete, ...currentAthletes]);
     setNewAthlete({
       memberNumber: '',
@@ -1683,13 +1717,35 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
 
   const addImportedPlayers = (players: PlayerImportData[]) => {
     const baseId = Date.now();
+    let addedCount = 0;
+    let duplicateCount = 0;
 
-    setAthleteList((currentAthletes) => [
-      ...players.map((player, index) =>
-        athleteFromImportData(player, baseId + index, currentOrganizationId),
-      ),
-      ...currentAthletes,
-    ]);
+    setAthleteList((currentAthletes) => {
+      const existingKeys = new Set(
+        currentAthletes
+          .filter((athlete) => athlete.organizationId === currentOrganizationId)
+          .map((athlete) => getAthleteDuplicateKey(athlete)),
+      );
+      const athletesToAdd: Athlete[] = [];
+
+      players.forEach((player, index) => {
+        const athlete = athleteFromImportData(player, baseId + index, currentOrganizationId);
+        const duplicateKey = getAthleteDuplicateKey(athlete);
+
+        if (existingKeys.has(duplicateKey)) {
+          duplicateCount += 1;
+          return;
+        }
+
+        existingKeys.add(duplicateKey);
+        athletesToAdd.push(athlete);
+        addedCount += 1;
+      });
+
+      return [...athletesToAdd, ...currentAthletes];
+    });
+
+    return { addedCount, duplicateCount };
   };
 
   const clearPhotoSelection = () => {
@@ -1743,11 +1799,26 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         return;
       }
 
-      addImportedPlayers(players);
+      const { addedCount, duplicateCount } = addImportedPlayers(players);
+
+      if (addedCount === 0) {
+        const duplicateText =
+          duplicateCount > 0
+            ? ` ${duplicateCount} duplicado(s) no se importaron: se mantiene el registro anterior.`
+            : '';
+
+        setImportStatus('error');
+        setImportMessage(`No se importaron jugadores nuevos.${duplicateText}`);
+        setSaveMessage(`No se importaron jugadores nuevos.${duplicateText}`);
+        return;
+      }
 
       const successText =
-        t('import.success', { count: players.length, name: file.name }) +
-        (skipped > 0 ? t('import.skipped', { count: skipped }) : '');
+        t('import.success', { count: addedCount, name: file.name }) +
+        (skipped > 0 ? t('import.skipped', { count: skipped }) : '') +
+        (duplicateCount > 0
+          ? ` ${duplicateCount} duplicado(s) no se importaron: se mantiene el registro anterior.`
+          : '');
 
       setImportStatus('success');
       setImportMessage(successText);
@@ -1808,7 +1879,15 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         return;
       }
 
-      addImportedPlayers([extracted]);
+      const { addedCount, duplicateCount } = addImportedPlayers([extracted]);
+
+      if (addedCount === 0 && duplicateCount > 0) {
+        setImportMessage(
+          `El jugador ${extracted.lastName.toUpperCase()} ${extracted.firstName.toUpperCase()} ya existe. Se mantiene el registro anterior.`,
+        );
+        return;
+      }
+
       setImportMessage(
         t('import.fromPhoto', {
           name: `${extracted.lastName.toUpperCase()} ${extracted.firstName.toUpperCase()}`,
