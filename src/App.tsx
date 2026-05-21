@@ -144,6 +144,7 @@ const rememberedPasswordKey = 'sportia.rememberedPassword';
 const preferredSportKey = 'sportia.preferredSport';
 const organizationOptionsKey = 'sportia.organizations';
 const preferredOrganizationKey = 'sportia.preferredOrganization';
+const athleteListStorageKey = 'sportia.athletes';
 const protectedRoles: ProtectedRole[] = ['Staff', 'Coordinación', 'Master'];
 const rolePasswords: Record<ProtectedRole, string> = {
   Staff: 'staff2026',
@@ -910,6 +911,91 @@ const initialAthletes: Athlete[] = ([
   organizationId: DEFAULT_ORGANIZATION_ID,
 }));
 
+function isAttendanceStatus(value: unknown): value is AttendanceStatus {
+  return value === 'Presente' || value === 'Ausente';
+}
+
+function isMemberStatus(value: unknown): value is Athlete['memberStatus'] {
+  return value === 'Activo' || value === 'Inactivo';
+}
+
+function normalizeStoredAthlete(value: unknown): Athlete | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const athlete = value as Partial<Athlete>;
+
+  if (
+    typeof athlete.id !== 'number' ||
+    typeof athlete.lastName !== 'string' ||
+    typeof athlete.firstName !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    id: athlete.id,
+    organizationId: athlete.organizationId ?? DEFAULT_ORGANIZATION_ID,
+    memberNumber: athlete.memberNumber ?? '',
+    lastName: athlete.lastName,
+    firstName: athlete.firstName,
+    dni: athlete.dni ?? '',
+    address: athlete.address ?? '',
+    birthDate: athlete.birthDate ?? '',
+    age: athlete.age ?? '',
+    playerPhone: athlete.playerPhone ?? '',
+    fatherPhone: athlete.fatherPhone ?? '',
+    motherPhone: athlete.motherPhone ?? '',
+    email: athlete.email ?? '',
+    healthInsurance: athlete.healthInsurance ?? '',
+    healthInsuranceNumber: athlete.healthInsuranceNumber ?? '',
+    paymentMethod: athlete.paymentMethod ?? '',
+    memberStatus: isMemberStatus(athlete.memberStatus) ? athlete.memberStatus : 'Activo',
+    membershipType: athlete.membershipType ?? '',
+    nextBillingDate: athlete.nextBillingDate ?? '',
+    sport: athlete.sport ?? sportOptions[0],
+    team: athlete.team ?? '',
+    cohort: athlete.cohort ?? '',
+    perfectAttendance30Days: Boolean(athlete.perfectAttendance30Days),
+    trainingsAttended: athlete.trainingsAttended ?? 0,
+    trainingsTotal: athlete.trainingsTotal ?? 0,
+    matchesAttended: athlete.matchesAttended ?? 0,
+    matchesTotal: athlete.matchesTotal ?? 0,
+    toursAttended: athlete.toursAttended ?? 0,
+    toursTotal: athlete.toursTotal ?? 0,
+    stayedAsGuest: Boolean(athlete.stayedAsGuest),
+    hostedGuest: Boolean(athlete.hostedGuest),
+    status: isAttendanceStatus(athlete.status) ? athlete.status : 'Presente',
+  };
+}
+
+function readStoredAthletes(): Athlete[] {
+  const storedAthletes = readStoredValue(athleteListStorageKey);
+
+  if (!storedAthletes) {
+    return initialAthletes;
+  }
+
+  try {
+    const parsedAthletes = JSON.parse(storedAthletes) as unknown[];
+
+    if (!Array.isArray(parsedAthletes)) {
+      return initialAthletes;
+    }
+
+    return parsedAthletes
+      .map((athlete) => normalizeStoredAthlete(athlete))
+      .filter((athlete): athlete is Athlete => athlete !== null);
+  } catch {
+    return initialAthletes;
+  }
+}
+
+function writeStoredAthletes(athletes: Athlete[]) {
+  writeStoredValue(athleteListStorageKey, JSON.stringify(athletes));
+}
+
 function decodeGoogleCredential(credential: string): GoogleJwtPayload | null {
   const [, payload] = credential.split('.');
 
@@ -1234,7 +1320,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [userRole, setUserRole] = useState<UserRole>('Jugador');
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [athleteList, setAthleteList] = useState<Athlete[]>(initialAthletes);
+  const [athleteList, setAthleteList] = useState<Athlete[]>(() => readStoredAthletes());
   const [newAthlete, setNewAthlete] = useState({
     memberNumber: '',
     lastName: '',
@@ -1298,6 +1384,9 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       },
     )[0],
   );
+  useEffect(() => {
+    writeStoredAthletes(athleteList);
+  }, [athleteList]);
   const tenantAthleteList = useMemo(
     () => filterByOrganizationId(athleteList, currentOrganizationId),
     [athleteList, currentOrganizationId],
