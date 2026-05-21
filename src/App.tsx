@@ -1401,7 +1401,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     [athletesForView],
   );
   const isPrivilegedUser = userRole === 'Staff' || userRole === 'Coordinación' || userRole === 'Master';
-  const canImportPlayers = userRole === 'Staff' || userRole === 'Coordinación';
+  const canImportPlayers =
+    userRole === 'Staff' || userRole === 'Coordinación' || userRole === 'Master';
   const isMasterUser = userRole === 'Master';
   const selectedPlayer =
     tenantAthleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
@@ -2792,6 +2793,12 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
             ) : null}
           </div>
         ) : null}
+
+        <div className="manual-entry-heading">
+          <p className="eyebrow">Carga manual</p>
+          <h3>Agregar jugador manualmente</h3>
+          <p>Usá este formulario cuando quieras cargar o corregir una ficha individual sin planilla.</p>
+        </div>
 
         <form className="data-form data-form-expanded" onSubmit={handleAthleteSubmit}>
           <label>

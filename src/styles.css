@@ -1165,6 +1165,28 @@ button {
   font-weight: 800;
 }
 
+.manual-entry-heading {
+  margin-top: 22px;
+  padding: 18px 20px;
+  border: 1px solid #edf2ef;
+  border-radius: 24px;
+  background: #fbfdfc;
+}
+
+.manual-entry-heading h3 {
+  margin: 6px 0 8px;
+  color: #102017;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+}
+
+.manual-entry-heading p:not(.eyebrow) {
+  max-width: 760px;
+  margin: 0;
+  color: #667b6f;
+  line-height: 1.6;
+  font-weight: 700;
+}
+
 .data-table {
   display: grid;
   gap: 10px;
