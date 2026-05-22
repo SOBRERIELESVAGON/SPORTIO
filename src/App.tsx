@@ -2393,36 +2393,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setSaveMessage(t('table.restoredCount', { count: athletesToRestore.length }));
   };
 
-  const markAllAttendancePresent = () => {
-    setAthleteList((currentAthletes) =>
-      currentAthletes.map((athlete) => {
-        if (athlete.organizationId !== currentOrganizationId || athlete.sport !== preferredSport) {
-          return athlete;
-        }
-
-        if (attendanceActivity === 'Entrenamiento') {
-          const trainingsTotal = Math.max(athlete.trainingsTotal, 1);
-
-          return {
-            ...athlete,
-            status: 'Presente',
-            trainingsTotal,
-            trainingsAttended: trainingsTotal,
-          };
-        }
-
-        const matchesTotal = Math.max(athlete.matchesTotal, 1);
-
-        return {
-          ...athlete,
-          status: 'Presente',
-          matchesTotal,
-          matchesAttended: matchesTotal,
-        };
-      }),
-    );
-  };
-
   const updateActivityAttendance = (athlete: Athlete, status: AttendanceStatus) => {
     assertSameOrganization(athlete, currentOrganizationId);
     const isPresent = status === 'Presente';
@@ -2455,24 +2425,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       toursTotal,
       toursAttended: travels ? toursTotal : 0,
     });
-  };
-
-  const markAllPlayersTraveling = () => {
-    setAthleteList((currentAthletes) =>
-      currentAthletes.map((athlete) => {
-        if (athlete.organizationId !== currentOrganizationId || athlete.sport !== preferredSport) {
-          return athlete;
-        }
-
-        const toursTotal = Math.max(athlete.toursTotal, 1);
-
-        return {
-          ...athlete,
-          toursTotal,
-          toursAttended: toursTotal,
-        };
-      }),
-    );
   };
 
   const handleReportScopeChange = (scope: ReportScope) => {
@@ -3299,7 +3251,11 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       <section className="operations-panel" id="control-asistencia" aria-labelledby="attendance-control-title">
         <div className="section-heading">
           <p className="eyebrow">{t('ops.attendance.eyebrow')}</p>
-          <h2 id="attendance-control-title">{t('ops.attendance.title')}</h2>
+          <h2 id="attendance-control-title">
+            <a className="section-title-link" href="#planilla-asistencia">
+              {t('ops.attendance.title')}
+            </a>
+          </h2>
           <p>
             {t('ops.attendance.desc')}
           </p>
@@ -3318,12 +3274,9 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
               <option value="Partido">{translateActivity(selectedLanguage, 'Partido')}</option>
             </select>
           </label>
-          <button className="export-button" type="button" onClick={markAllAttendancePresent}>
-            {t('ops.attendance.allPresent')}
-          </button>
         </div>
 
-        <div className="attendance-control-list">
+        <div className="attendance-control-list" id="planilla-asistencia">
           {athletesForView.map((athlete) => (
             <article className="attendance-control-row" key={`attendance-${athlete.id}`}>
               <div>
@@ -3356,19 +3309,17 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       <section className="operations-panel" id="control-giras" aria-labelledby="tour-control-title">
         <div className="section-heading">
           <p className="eyebrow">{t('ops.tours.eyebrow')}</p>
-          <h2 id="tour-control-title">{t('ops.tours.title')}</h2>
+          <h2 id="tour-control-title">
+            <a className="section-title-link" href="#planilla-giras">
+              {t('ops.tours.title')}
+            </a>
+          </h2>
           <p>
             {t('ops.tours.desc')}
           </p>
         </div>
 
-        <div className="operation-toolbar">
-          <button className="export-button" type="button" onClick={markAllPlayersTraveling}>
-            {t('ops.tours.allPresent')}
-          </button>
-        </div>
-
-        <div className="tour-control-list">
+        <div className="tour-control-list" id="planilla-giras">
           {athletesForView.map((athlete) => {
             const travels = athlete.toursTotal === 0 || athlete.toursAttended >= athlete.toursTotal;
 
