@@ -222,6 +222,81 @@ a {
   letter-spacing: -0.05em;
 }
 
+.player-selector {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.player-selector-trigger {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d7e5dd;
+  border-radius: 14px;
+  color: #102017;
+  background: #f7fbf9;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.player-selector-menu {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  padding: 10px;
+  overflow-y: auto;
+  border: 1px solid #dce9e1;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 16px 34px rgba(16, 32, 23, 0.12);
+}
+
+.player-selector-option {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #edf3ef;
+  border-radius: 10px;
+  color: #102017;
+  background: #fbfdfc;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.player-selector-option:hover,
+.player-selector-option[aria-selected="true"] {
+  border-color: #b8dfca;
+  background: #ecf9f1;
+}
+
+.player-selector-option small {
+  color: #61796b;
+}
+
+.selected-athlete-note {
+  margin: 0 0 14px;
+  color: #355244;
+  font-size: 0.92rem;
+}
+
+.selected-athlete-card {
+  margin: 0;
+}
+
+.selected-athlete-empty {
+  margin: 0;
+  color: #667b6f;
+  font-size: 0.92rem;
+}
+
 .athlete-list,
 .session-list {
   display: grid;
