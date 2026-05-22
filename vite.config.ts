@@ -9,6 +9,7 @@ const sharedDataDirectory = path.resolve(process.cwd(), '.sportia-data');
 const sharedAthletesPath = path.join(sharedDataDirectory, 'athletes.json');
 const sharedSurveysPath = path.join(sharedDataDirectory, 'surveys.json');
 const sharedCommunicationsPath = path.join(sharedDataDirectory, 'communications.json');
+const sharedPhysicalTestsPath = path.join(sharedDataDirectory, 'physical-tests.json');
 
 function readRequestBody(request: IncomingMessage) {
   return new Promise<string>((resolve, reject) => {
@@ -84,6 +85,12 @@ function sharedDemoDataPlugin(): Plugin {
         '/api/communications',
         sharedCommunicationsPath,
         'communications',
+      );
+      configureSharedJsonEndpoint(
+        server,
+        '/api/physical-tests',
+        sharedPhysicalTestsPath,
+        'physical tests',
       );
     },
   };

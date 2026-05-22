@@ -788,6 +788,7 @@ button {
 .player-list-panel,
 .survey-panel,
 .communication-panel,
+.physical-test-panel,
 .report-panel,
 .ranking-panel,
 .operations-panel,
@@ -891,6 +892,12 @@ button {
   gap: 12px;
 }
 
+.collaboration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .collaboration-card h3 {
   margin: 4px 0 8px;
   color: #102017;
@@ -924,6 +931,56 @@ button {
 .survey-option strong {
   color: #0f7a3f;
   white-space: nowrap;
+}
+
+.physical-test-list {
+  display: grid;
+  gap: 12px;
+}
+
+.physical-test-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #edf2ef;
+  border-radius: 22px;
+  background: #fbfdfc;
+}
+
+.physical-test-card h3,
+.physical-test-card p {
+  margin: 0;
+}
+
+.physical-test-card h3 {
+  color: #102017;
+  font-size: 1.2rem;
+}
+
+.physical-test-card strong {
+  color: #0f7a3f;
+  font-size: 1.4rem;
+}
+
+.physical-test-card small,
+.physical-test-card p {
+  color: #667b6f;
+  line-height: 1.6;
+  font-weight: 700;
+}
+
+.physical-test-chart {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8f3ed;
+}
+
+.physical-test-chart span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b6f264, #16a34a);
 }
 
 .section-heading > p:not(.eyebrow) {
@@ -1940,6 +1997,7 @@ button {
   .player-list-panel,
   .survey-panel,
   .communication-panel,
+  .physical-test-panel,
   .report-panel,
   .ranking-panel,
   .operations-panel,

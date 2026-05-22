@@ -112,6 +112,7 @@ type Survey = {
   options: SurveyOption[];
   createdBy: string;
   createdAt: string;
+  reviewedBy: string[];
 };
 
 type Communication = {
@@ -121,6 +122,20 @@ type Communication = {
   athleteId?: number;
   title: string;
   message: string;
+  createdBy: string;
+  createdAt: string;
+  readBy: string[];
+};
+
+type PhysicalTestRecord = {
+  id: number;
+  organizationId: OrganizationId;
+  athleteId: number;
+  testType: string;
+  value: number;
+  unit: string;
+  testDate: string;
+  notes: string;
   createdBy: string;
   createdAt: string;
 };
@@ -172,6 +187,7 @@ const preferredOrganizationKey = 'sportia.preferredOrganization';
 const athleteListStorageKey = 'sportia.athletes';
 const surveysStorageKey = 'sportia.surveys';
 const communicationsStorageKey = 'sportia.communications';
+const physicalTestsStorageKey = 'sportia.physicalTests';
 const protectedRoles: ProtectedRole[] = ['Staff', 'Coordinación', 'Master'];
 const rolePasswords: Record<ProtectedRole, string> = {
   Staff: 'staff2026',
@@ -844,6 +860,9 @@ function normalizeStoredSurvey(value: unknown): Survey | null {
       })),
     createdBy: survey.createdBy ?? 'Sistema',
     createdAt: survey.createdAt ?? new Date().toISOString(),
+    reviewedBy: Array.isArray(survey.reviewedBy)
+      ? survey.reviewedBy.filter((value): value is string => typeof value === 'string')
+      : [],
   };
 }
 
@@ -871,6 +890,39 @@ function normalizeStoredCommunication(value: unknown): Communication | null {
     message: communication.message,
     createdBy: communication.createdBy ?? 'Sistema',
     createdAt: communication.createdAt ?? new Date().toISOString(),
+    readBy: Array.isArray(communication.readBy)
+      ? communication.readBy.filter((value): value is string => typeof value === 'string')
+      : [],
+  };
+}
+
+function normalizeStoredPhysicalTest(value: unknown): PhysicalTestRecord | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as Partial<PhysicalTestRecord>;
+
+  if (
+    typeof record.id !== 'number' ||
+    typeof record.athleteId !== 'number' ||
+    typeof record.testType !== 'string' ||
+    typeof record.value !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    id: record.id,
+    organizationId: record.organizationId ?? DEFAULT_ORGANIZATION_ID,
+    athleteId: record.athleteId,
+    testType: record.testType,
+    value: record.value,
+    unit: record.unit ?? '',
+    testDate: record.testDate ?? new Date().toISOString().slice(0, 10),
+    notes: record.notes ?? '',
+    createdBy: record.createdBy ?? 'Sistema',
+    createdAt: record.createdAt ?? new Date().toISOString(),
   };
 }
 
@@ -920,6 +972,30 @@ function readStoredCommunications(): Communication[] {
 
 function writeStoredCommunications(communications: Communication[]) {
   writeStoredValue(communicationsStorageKey, JSON.stringify(communications));
+}
+
+function readStoredPhysicalTests(): PhysicalTestRecord[] {
+  const storedRecords = readStoredValue(physicalTestsStorageKey);
+
+  if (!storedRecords) {
+    return [];
+  }
+
+  try {
+    const parsedRecords = JSON.parse(storedRecords) as unknown[];
+
+    return Array.isArray(parsedRecords)
+      ? parsedRecords
+          .map((record) => normalizeStoredPhysicalTest(record))
+          .filter((record): record is PhysicalTestRecord => record !== null)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredPhysicalTests(records: PhysicalTestRecord[]) {
+  writeStoredValue(physicalTestsStorageKey, JSON.stringify(records));
 }
 
 function decodeGoogleCredential(credential: string): GoogleJwtPayload | null {
@@ -1254,6 +1330,10 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     readStoredCommunications(),
   );
   const [hasLoadedSharedCommunications, setHasLoadedSharedCommunications] = useState(false);
+  const [physicalTests, setPhysicalTests] = useState<PhysicalTestRecord[]>(() =>
+    readStoredPhysicalTests(),
+  );
+  const [hasLoadedSharedPhysicalTests, setHasLoadedSharedPhysicalTests] = useState(false);
   const [surveyQuestion, setSurveyQuestion] = useState('');
   const [surveyOptionsText, setSurveyOptionsText] = useState('Sí\nNo');
   const [communicationAudience, setCommunicationAudience] =
@@ -1261,6 +1341,14 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [communicationAthleteId, setCommunicationAthleteId] = useState('');
   const [communicationTitle, setCommunicationTitle] = useState('');
   const [communicationMessage, setCommunicationMessage] = useState('');
+  const [physicalTestAthleteId, setPhysicalTestAthleteId] = useState('');
+  const [physicalTestType, setPhysicalTestType] = useState('Velocidad 40m');
+  const [physicalTestValue, setPhysicalTestValue] = useState('');
+  const [physicalTestUnit, setPhysicalTestUnit] = useState('seg');
+  const [physicalTestDate, setPhysicalTestDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [physicalTestNotes, setPhysicalTestNotes] = useState('');
   const [newAthlete, setNewAthlete] = useState({
     memberNumber: '',
     lastName: '',
@@ -1456,6 +1544,52 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       // Keep the browser copy even if the shared demo API is temporarily unavailable.
     });
   }, [communications, hasLoadedSharedCommunications]);
+
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    fetch('/api/physical-tests')
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((sharedRecords: unknown) => {
+        if (ignoreResponse || !Array.isArray(sharedRecords)) {
+          return;
+        }
+
+        setPhysicalTests(
+          sharedRecords
+            .map((record) => normalizeStoredPhysicalTest(record))
+            .filter((record): record is PhysicalTestRecord => record !== null),
+        );
+      })
+      .catch(() => {
+        // Browser-local persistence remains available if the demo API is unavailable.
+      })
+      .finally(() => {
+        if (!ignoreResponse) {
+          setHasLoadedSharedPhysicalTests(true);
+        }
+      });
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    writeStoredPhysicalTests(physicalTests);
+
+    if (!hasLoadedSharedPhysicalTests) {
+      return;
+    }
+
+    fetch('/api/physical-tests', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(physicalTests),
+    }).catch(() => {
+      // Keep the browser copy even if the shared demo API is temporarily unavailable.
+    });
+  }, [physicalTests, hasLoadedSharedPhysicalTests]);
   const tenantAthleteList = useMemo(
     () => filterByOrganizationId(athleteList, currentOrganizationId),
     [athleteList, currentOrganizationId],
@@ -1483,6 +1617,17 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         (communication) => communication.organizationId === currentOrganizationId,
       ),
     [communications, currentOrganizationId],
+  );
+  const physicalTestsForOrganization = useMemo(
+    () =>
+      physicalTests
+        .filter((record) => record.organizationId === currentOrganizationId)
+        .sort((left, right) => right.testDate.localeCompare(left.testDate)),
+    [physicalTests, currentOrganizationId],
+  );
+  const physicalTestChartMax = Math.max(
+    1,
+    ...physicalTestsForOrganization.map((record) => Math.abs(record.value)),
   );
   const selectedPlayer =
     tenantAthleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
@@ -1696,6 +1841,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       })),
       createdBy: user?.name ?? translateRole(selectedLanguage, userRole),
       createdAt: new Date().toISOString(),
+      reviewedBy: [],
     };
 
     setSurveys((currentSurveys) => [survey, ...currentSurveys]);
@@ -1714,6 +1860,31 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
               ),
             }
           : survey,
+      ),
+    );
+  };
+
+  const markSurveyReviewed = (surveyId: number) => {
+    const reviewer = user?.name ?? translateRole(selectedLanguage, userRole);
+
+    setSurveys((currentSurveys) =>
+      currentSurveys.map((survey) =>
+        survey.id === surveyId &&
+        survey.organizationId === currentOrganizationId &&
+        !survey.reviewedBy.includes(reviewer)
+          ? { ...survey, reviewedBy: [...survey.reviewedBy, reviewer] }
+          : survey,
+      ),
+    );
+  };
+
+  const deleteSurvey = (surveyId: number) => {
+    setSurveys((currentSurveys) =>
+      currentSurveys.filter(
+        (survey) =>
+          survey.organizationId !== currentOrganizationId ||
+          survey.id !== surveyId ||
+          survey.reviewedBy.length === 0,
       ),
     );
   };
@@ -1739,6 +1910,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       message,
       createdBy: user?.name ?? translateRole(selectedLanguage, userRole),
       createdAt: new Date().toISOString(),
+      readBy: [],
     };
 
     setCommunications((currentCommunications) => [communication, ...currentCommunications]);
@@ -1758,6 +1930,65 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     );
 
     return athlete ? `Individual: ${getAthleteFullName(athlete)}` : 'Individual';
+  };
+
+  const markCommunicationRead = (communicationId: number) => {
+    const reader = user?.name ?? translateRole(selectedLanguage, userRole);
+
+    setCommunications((currentCommunications) =>
+      currentCommunications.map((communication) =>
+        communication.id === communicationId &&
+        communication.organizationId === currentOrganizationId &&
+        !communication.readBy.includes(reader)
+          ? { ...communication, readBy: [...communication.readBy, reader] }
+          : communication,
+      ),
+    );
+  };
+
+  const deleteCommunication = (communicationId: number) => {
+    setCommunications((currentCommunications) =>
+      currentCommunications.filter(
+        (communication) =>
+          communication.organizationId !== currentOrganizationId ||
+          communication.id !== communicationId ||
+          communication.readBy.length === 0,
+      ),
+    );
+  };
+
+  const handlePhysicalTestSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const athleteId = Number(physicalTestAthleteId);
+    const value = Number(physicalTestValue.replace(',', '.'));
+
+    if (!athleteId || !physicalTestType.trim() || !Number.isFinite(value)) {
+      return;
+    }
+
+    const record: PhysicalTestRecord = {
+      id: Date.now(),
+      organizationId: currentOrganizationId,
+      athleteId,
+      testType: physicalTestType.trim(),
+      value,
+      unit: physicalTestUnit.trim(),
+      testDate: physicalTestDate,
+      notes: physicalTestNotes.trim(),
+      createdBy: user?.name ?? translateRole(selectedLanguage, userRole),
+      createdAt: new Date().toISOString(),
+    };
+
+    setPhysicalTests((currentRecords) => [record, ...currentRecords]);
+    setPhysicalTestValue('');
+    setPhysicalTestNotes('');
+  };
+
+  const getPhysicalTestAthleteName = (athleteId: number) => {
+    const athlete = tenantAthleteList.find((currentAthlete) => currentAthlete.id === athleteId);
+
+    return athlete ? getAthleteFullName(athlete) : 'Jugador no encontrado';
   };
 
   const handleAthleteSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -2305,6 +2536,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           {isPrivilegedUser ? <a href="#listado-jugadores">Listado de jugadores</a> : null}
           {isPrivilegedUser ? <a href="#encuestas">Encuestas</a> : null}
           {isPrivilegedUser ? <a href="#comunicaciones">Comunicaciones</a> : null}
+          {isPrivilegedUser ? <a href="#tests-fisicos">Tests físicos</a> : null}
           {userRole === 'Jugador' ? <a href="#mi-ficha">{t('nav.myProfile')}</a> : null}
           <a href="#ranking">{t('nav.ranking')}</a>
           {isMasterUser ? <a href="#master-panel">{t('nav.master')}</a> : null}
@@ -2539,6 +2771,10 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                           Creada por {survey.createdBy} ·{' '}
                           {new Date(survey.createdAt).toLocaleDateString('es-AR')}
                         </small>
+                        <small>
+                          Reporte: {totalVotes} voto(s) · Revisada por{' '}
+                          {survey.reviewedBy.length > 0 ? survey.reviewedBy.join(', ') : 'nadie'}
+                        </small>
                       </div>
                       <div className="survey-options">
                         {survey.options.map((option) => {
@@ -2559,6 +2795,23 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                             </button>
                           );
                         })}
+                      </div>
+                      <div className="collaboration-actions">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => markSurveyReviewed(survey.id)}
+                        >
+                          Marcar revisada
+                        </button>
+                        <button
+                          className="delete-player-button"
+                          type="button"
+                          disabled={survey.reviewedBy.length === 0}
+                          onClick={() => deleteSurvey(survey.id)}
+                        >
+                          Eliminar
+                        </button>
                       </div>
                     </article>
                   );
@@ -2649,12 +2902,146 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                         Publicado por {communication.createdBy} ·{' '}
                         {new Date(communication.createdAt).toLocaleDateString('es-AR')}
                       </small>
+                      <small>
+                        Reporte: {communication.readBy.length > 0 ? 'Leída' : 'No leída'} ·{' '}
+                        {communication.readBy.length > 0
+                          ? `Leída por ${communication.readBy.join(', ')}`
+                          : 'Sin lecturas registradas'}
+                      </small>
                     </div>
                     <p>{communication.message}</p>
+                    <div className="collaboration-actions">
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => markCommunicationRead(communication.id)}
+                      >
+                        Marcar leída
+                      </button>
+                      <button
+                        className="delete-player-button"
+                        type="button"
+                        disabled={communication.readBy.length === 0}
+                        onClick={() => deleteCommunication(communication.id)}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </article>
                 ))
               ) : (
                 <p className="athlete-list-empty">Todavía no hay comunicaciones publicadas.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {isPrivilegedUser ? (
+        <section className="physical-test-panel" id="tests-fisicos" aria-labelledby="physical-test-title">
+          <div className="section-heading">
+            <p className="eyebrow">Rendimiento</p>
+            <h2 id="physical-test-title">Tests físicos periódicos</h2>
+            <p>
+              Registrá velocidad, resistencia, fuerza o flexibilidad y revisá la evolución temporal.
+            </p>
+          </div>
+
+          <div className="collaboration-grid">
+            <form className="collaboration-form" onSubmit={handlePhysicalTestSubmit}>
+              <label>
+                Jugador
+                <select
+                  value={physicalTestAthleteId}
+                  onChange={(event) => setPhysicalTestAthleteId(event.target.value)}
+                >
+                  <option value="">Seleccionar jugador</option>
+                  {tenantAthleteList.map((athlete) => (
+                    <option value={athlete.id} key={athlete.id}>
+                      {getAthleteFullName(athlete)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Test
+                <select
+                  value={physicalTestType}
+                  onChange={(event) => setPhysicalTestType(event.target.value)}
+                >
+                  <option value="Velocidad 40m">Velocidad 40m</option>
+                  <option value="Test de Cooper">Test de Cooper</option>
+                  <option value="Fuerza">Fuerza</option>
+                  <option value="Flexibilidad">Flexibilidad</option>
+                </select>
+              </label>
+              <label>
+                Marca
+                <input
+                  type="number"
+                  step="0.01"
+                  value={physicalTestValue}
+                  onChange={(event) => setPhysicalTestValue(event.target.value)}
+                  placeholder="Ej: 6.8"
+                />
+              </label>
+              <label>
+                Unidad
+                <input
+                  type="text"
+                  value={physicalTestUnit}
+                  onChange={(event) => setPhysicalTestUnit(event.target.value)}
+                  placeholder="seg, m, reps, cm"
+                />
+              </label>
+              <label>
+                Fecha
+                <input
+                  type="date"
+                  value={physicalTestDate}
+                  onChange={(event) => setPhysicalTestDate(event.target.value)}
+                />
+              </label>
+              <label>
+                Observaciones
+                <textarea
+                  value={physicalTestNotes}
+                  onChange={(event) => setPhysicalTestNotes(event.target.value)}
+                  rows={3}
+                  placeholder="Condiciones, lesión, clima, etc."
+                />
+              </label>
+              <button className="primary-button form-button" type="submit">
+                Guardar marca
+              </button>
+            </form>
+
+            <div className="physical-test-list" aria-label="Evolución temporal de tests físicos">
+              {physicalTestsForOrganization.length > 0 ? (
+                physicalTestsForOrganization.map((record) => {
+                  const barWidth = Math.max(8, Math.round((Math.abs(record.value) / physicalTestChartMax) * 100));
+
+                  return (
+                    <article className="physical-test-card" key={record.id}>
+                      <div>
+                        <span className="eyebrow">{record.testType}</span>
+                        <h3>{getPhysicalTestAthleteName(record.athleteId)}</h3>
+                        <small>
+                          {new Date(record.testDate).toLocaleDateString('es-AR')} · Cargado por {record.createdBy}
+                        </small>
+                      </div>
+                      <strong>
+                        {record.value} {record.unit}
+                      </strong>
+                      <div className="physical-test-chart" aria-hidden="true">
+                        <span style={{ width: `${barWidth}%` }} />
+                      </div>
+                      {record.notes ? <p>{record.notes}</p> : null}
+                    </article>
+                  );
+                })
+              ) : (
+                <p className="athlete-list-empty">Todavía no hay marcas físicas cargadas.</p>
               )}
             </div>
           </div>
