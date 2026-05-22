@@ -785,6 +785,7 @@ button {
 }
 
 .data-entry-panel,
+.player-list-panel,
 .report-panel,
 .ranking-panel,
 .operations-panel,
@@ -798,6 +799,45 @@ button {
   border-radius: 32px;
   background: #fff;
   box-shadow: 0 22px 70px rgba(16, 32, 23, 0.1);
+}
+
+.player-list-table {
+  display: grid;
+  gap: 10px;
+  overflow-x: auto;
+}
+
+.player-list-header,
+.player-list-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.9fr 1fr 1fr auto;
+  gap: 16px;
+  align-items: center;
+  min-width: 820px;
+}
+
+.player-list-header {
+  padding: 0 16px;
+  color: #667b6f;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.player-list-row {
+  padding: 14px 16px;
+  border: 1px solid #edf2ef;
+  border-radius: 20px;
+  background: #fbfdfc;
+}
+
+.player-list-row strong {
+  color: #102017;
+}
+
+.player-list-row span:not(.status) {
+  color: #667b6f;
+  font-weight: 700;
 }
 
 .section-heading > p:not(.eyebrow) {
@@ -1830,6 +1870,7 @@ button {
   .panel,
   .metric-card,
   .data-entry-panel,
+  .player-list-panel,
   .report-panel,
   .ranking-panel,
   .operations-panel,
@@ -1849,17 +1890,22 @@ button {
   .athlete-row,
   .session-card,
   .data-table-header,
-  .data-table-row {
+  .data-table-row,
+  .player-list-header,
+  .player-list-row {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .data-table-header,
-  .data-table-row {
+  .data-table-row,
+  .player-list-header,
+  .player-list-row {
     display: flex;
   }
 
-  .data-table-header {
+  .data-table-header,
+  .player-list-header {
     display: none;
   }
 

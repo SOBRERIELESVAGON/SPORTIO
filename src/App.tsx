@@ -2285,6 +2285,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         <div className="nav-links">
           {isPrivilegedUser ? <a href="#control-asistencia">{t('nav.attendance')}</a> : null}
           {isPrivilegedUser ? <a href="#carga-datos">{t('nav.dataEntry')}</a> : null}
+          {isPrivilegedUser ? <a href="#listado-jugadores">Listado de jugadores</a> : null}
           {userRole === 'Jugador' ? <a href="#mi-ficha">{t('nav.myProfile')}</a> : null}
           <a href="#ranking">{t('nav.ranking')}</a>
           {isMasterUser ? <a href="#master-panel">{t('nav.master')}</a> : null}
@@ -2428,6 +2429,47 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
               <strong>{metric.value}</strong>
             </article>
           ))}
+        </section>
+      ) : null}
+
+      {isPrivilegedUser ? (
+        <section
+          className="player-list-panel"
+          id="listado-jugadores"
+          aria-labelledby="player-list-title"
+        >
+          <div className="section-heading">
+            <p className="eyebrow">Padrón por deporte</p>
+            <h2 id="player-list-title">Listado de jugadores</h2>
+            <p>
+              Mostrando {athletesForView.length} jugador(es) cargados para {preferredSport}.
+            </p>
+          </div>
+
+          <div className="player-list-table" aria-label="Listado de jugadores por deporte">
+            <div className="player-list-header">
+              <span>{t('table.player')}</span>
+              <span>{t('table.dni')}</span>
+              <span>{t('form.team')}</span>
+              <span>{t('form.cohort')}</span>
+              <span>{t('table.attendance')}</span>
+            </div>
+            {athletesForView.length > 0 ? (
+              athletesForView.map((athlete) => (
+                <article className="player-list-row" key={`player-list-${athlete.id}`}>
+                  <strong>{getAthleteFullName(athlete)}</strong>
+                  <span>{athlete.dni || '-'}</span>
+                  <span>{athlete.team || '-'}</span>
+                  <span>{athlete.cohort || '-'}</span>
+                  <span className={`status status-${athlete.status.toLowerCase()}`}>
+                    {translateAttendanceStatus(selectedLanguage, athlete.status)}
+                  </span>
+                </article>
+              ))
+            ) : (
+              <p className="athlete-list-empty">No hay jugadores cargados para {preferredSport}.</p>
+            )}
+          </div>
         </section>
       ) : null}
 
