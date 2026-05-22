@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+
 type Athlete = {
   id: number;
   name: string;
@@ -52,6 +54,28 @@ const metrics = [
 
 function App() {
   const presentCount = athletes.filter((athlete) => athlete.status === 'Presente').length;
+  const [isPlayerPickerOpen, setIsPlayerPickerOpen] = useState(false);
+  const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(null);
+  const playerSelectorRef = useRef<HTMLDivElement>(null);
+  const selectedAthlete = athletes.find((athlete) => athlete.id === selectedAthleteId) ?? null;
+
+  useEffect(() => {
+    if (!isPlayerPickerOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!playerSelectorRef.current?.contains(event.target as Node)) {
+        setIsPlayerPickerOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isPlayerPickerOpen]);
 
   return (
     <main className="app-shell">
@@ -90,20 +114,58 @@ function App() {
             <span>Entrenamiento de hoy</span>
             <strong>{presentCount}/{athletes.length}</strong>
           </div>
-          <h2>Lista rapida</h2>
-          <div className="athlete-list">
-            {athletes.map((athlete) => (
-              <article className="athlete-row" key={athlete.id}>
-                <div>
-                  <strong>{athlete.name}</strong>
-                  <span>{athlete.sport}</span>
-                </div>
-                <span className={`status status-${athlete.status.toLowerCase()}`}>
-                  {athlete.status}
-                </span>
-              </article>
-            ))}
+          <h2>Seleccion de jugador</h2>
+          <div className="player-selector" ref={playerSelectorRef}>
+            <button
+              type="button"
+              className="player-selector-trigger"
+              aria-haspopup="listbox"
+              aria-expanded={isPlayerPickerOpen}
+              onClick={() => setIsPlayerPickerOpen((prevOpen) => !prevOpen)}
+            >
+              {selectedAthlete ? selectedAthlete.name : 'Seleccionar jugador'}
+            </button>
+            {isPlayerPickerOpen && (
+              <div className="player-selector-menu" role="listbox" aria-label="Listado de jugadores">
+                {athletes.map((athlete) => (
+                  <button
+                    key={athlete.id}
+                    type="button"
+                    role="option"
+                    aria-selected={selectedAthlete?.id === athlete.id}
+                    className="player-selector-option"
+                    onClick={() => {
+                      setSelectedAthleteId(athlete.id);
+                      setIsPlayerPickerOpen(false);
+                    }}
+                  >
+                    <span>{athlete.name}</span>
+                    <small>
+                      {athlete.sport} · {athlete.status}
+                    </small>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+          {selectedAthlete && (
+            <p className="selected-athlete-note">
+              Jugador seleccionado: <strong>{selectedAthlete.name}</strong>
+            </p>
+          )}
+          {selectedAthlete ? (
+            <article className="athlete-row selected-athlete-card">
+              <div>
+                <strong>{selectedAthlete.name}</strong>
+                <span>{selectedAthlete.sport}</span>
+              </div>
+              <span className={`status status-${selectedAthlete.status.toLowerCase()}`}>
+                {selectedAthlete.status}
+              </span>
+            </article>
+          ) : (
+            <p className="selected-athlete-empty">Abre el listado y selecciona un jugador.</p>
+          )}
         </aside>
       </section>
 
