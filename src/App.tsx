@@ -1872,17 +1872,17 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     });
   };
 
-  const updateTourAttendance = (athlete: Athlete, isPresent: boolean) => {
+  const updateTourAttendance = (athlete: Athlete, travels: boolean) => {
     assertSameOrganization(athlete, currentOrganizationId);
     const toursTotal = Math.max(athlete.toursTotal, 1);
 
     updateAthlete(athlete.id, {
       toursTotal,
-      toursAttended: isPresent ? toursTotal : 0,
+      toursAttended: travels ? toursTotal : 0,
     });
   };
 
-  const markAllToursPresent = () => {
+  const markAllPlayersTraveling = () => {
     setAthleteList((currentAthletes) =>
       currentAthletes.map((athlete) => {
         if (athlete.organizationId !== currentOrganizationId || athlete.sport !== preferredSport) {
@@ -2460,14 +2460,14 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         </div>
 
         <div className="operation-toolbar">
-          <button className="export-button" type="button" onClick={markAllToursPresent}>
+          <button className="export-button" type="button" onClick={markAllPlayersTraveling}>
             {t('ops.tours.allPresent')}
           </button>
         </div>
 
         <div className="tour-control-list">
           {athletesForView.map((athlete) => {
-            const isTourPresent = athlete.toursTotal === 0 || athlete.toursAttended >= athlete.toursTotal;
+            const travels = athlete.toursTotal === 0 || athlete.toursAttended >= athlete.toursTotal;
 
             return (
               <article className="tour-control-row" key={`tour-${athlete.id}`}>
@@ -2477,18 +2477,18 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                 </div>
                 <div className="segmented-control" aria-label={t('ranking.tourOf', { name: getAthleteFullName(athlete) })}>
                   <button
-                    className={isTourPresent ? 'active' : ''}
+                    className={travels ? 'active' : ''}
                     type="button"
                     onClick={() => updateTourAttendance(athlete, true)}
                   >
-                    Presente
+                    Viaja
                   </button>
                   <button
-                    className={!isTourPresent ? 'danger active' : 'danger'}
+                    className={!travels ? 'danger active' : 'danger'}
                     type="button"
                     onClick={() => updateTourAttendance(athlete, false)}
                   >
-                    Ausente
+                    No viaja
                   </button>
                 </div>
                 <label className="inline-checkbox">
@@ -2509,7 +2509,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                       updateAthlete(athlete.id, { hostedGuest: event.target.checked })
                     }
                   />
-                  {t('ops.hostsGuest')}
+                  Recibe
                 </label>
               </article>
             );
