@@ -99,6 +99,32 @@ type AuthenticatedUser = {
   picture?: string;
 };
 
+type SurveyOption = {
+  id: string;
+  label: string;
+  votes: number;
+};
+
+type Survey = {
+  id: number;
+  organizationId: OrganizationId;
+  question: string;
+  options: SurveyOption[];
+  createdBy: string;
+  createdAt: string;
+};
+
+type Communication = {
+  id: number;
+  organizationId: OrganizationId;
+  audience: 'general' | 'individual';
+  athleteId?: number;
+  title: string;
+  message: string;
+  createdBy: string;
+  createdAt: string;
+};
+
 type AppProps = {
   googleClientIdConfigured: boolean;
   googleAdsConfigured: boolean;
@@ -144,6 +170,8 @@ const preferredSportKey = 'sportia.preferredSport';
 const organizationOptionsKey = 'sportia.organizations';
 const preferredOrganizationKey = 'sportia.preferredOrganization';
 const athleteListStorageKey = 'sportia.athletes';
+const surveysStorageKey = 'sportia.surveys';
+const communicationsStorageKey = 'sportia.communications';
 const protectedRoles: ProtectedRole[] = ['Staff', 'Coordinación', 'Master'];
 const rolePasswords: Record<ProtectedRole, string> = {
   Staff: 'staff2026',
@@ -781,6 +809,119 @@ function writeStoredAthletes(athletes: Athlete[]) {
   writeStoredValue(athleteListStorageKey, JSON.stringify(athletes));
 }
 
+function normalizeStoredSurvey(value: unknown): Survey | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const survey = value as Partial<Survey>;
+
+  if (
+    typeof survey.id !== 'number' ||
+    typeof survey.question !== 'string' ||
+    !Array.isArray(survey.options)
+  ) {
+    return null;
+  }
+
+  return {
+    id: survey.id,
+    organizationId: survey.organizationId ?? DEFAULT_ORGANIZATION_ID,
+    question: survey.question,
+    options: survey.options
+      .filter((option): option is SurveyOption =>
+        Boolean(
+          option &&
+            typeof option === 'object' &&
+            typeof option.id === 'string' &&
+            typeof option.label === 'string',
+        ),
+      )
+      .map((option) => ({
+        id: option.id,
+        label: option.label,
+        votes: Number.isFinite(option.votes) ? option.votes : 0,
+      })),
+    createdBy: survey.createdBy ?? 'Sistema',
+    createdAt: survey.createdAt ?? new Date().toISOString(),
+  };
+}
+
+function normalizeStoredCommunication(value: unknown): Communication | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const communication = value as Partial<Communication>;
+
+  if (
+    typeof communication.id !== 'number' ||
+    typeof communication.title !== 'string' ||
+    typeof communication.message !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    id: communication.id,
+    organizationId: communication.organizationId ?? DEFAULT_ORGANIZATION_ID,
+    audience: communication.audience === 'individual' ? 'individual' : 'general',
+    athleteId: communication.athleteId,
+    title: communication.title,
+    message: communication.message,
+    createdBy: communication.createdBy ?? 'Sistema',
+    createdAt: communication.createdAt ?? new Date().toISOString(),
+  };
+}
+
+function readStoredSurveys(): Survey[] {
+  const storedSurveys = readStoredValue(surveysStorageKey);
+
+  if (!storedSurveys) {
+    return [];
+  }
+
+  try {
+    const parsedSurveys = JSON.parse(storedSurveys) as unknown[];
+
+    return Array.isArray(parsedSurveys)
+      ? parsedSurveys
+          .map((survey) => normalizeStoredSurvey(survey))
+          .filter((survey): survey is Survey => survey !== null)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredSurveys(surveys: Survey[]) {
+  writeStoredValue(surveysStorageKey, JSON.stringify(surveys));
+}
+
+function readStoredCommunications(): Communication[] {
+  const storedCommunications = readStoredValue(communicationsStorageKey);
+
+  if (!storedCommunications) {
+    return [];
+  }
+
+  try {
+    const parsedCommunications = JSON.parse(storedCommunications) as unknown[];
+
+    return Array.isArray(parsedCommunications)
+      ? parsedCommunications
+          .map((communication) => normalizeStoredCommunication(communication))
+          .filter((communication): communication is Communication => communication !== null)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredCommunications(communications: Communication[]) {
+  writeStoredValue(communicationsStorageKey, JSON.stringify(communications));
+}
+
 function decodeGoogleCredential(credential: string): GoogleJwtPayload | null {
   const [, payload] = credential.split('.');
 
@@ -1107,6 +1248,19 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [athleteList, setAthleteList] = useState<Athlete[]>(() => readStoredAthletes());
   const [hasLoadedSharedAthletes, setHasLoadedSharedAthletes] = useState(false);
+  const [surveys, setSurveys] = useState<Survey[]>(() => readStoredSurveys());
+  const [hasLoadedSharedSurveys, setHasLoadedSharedSurveys] = useState(false);
+  const [communications, setCommunications] = useState<Communication[]>(() =>
+    readStoredCommunications(),
+  );
+  const [hasLoadedSharedCommunications, setHasLoadedSharedCommunications] = useState(false);
+  const [surveyQuestion, setSurveyQuestion] = useState('');
+  const [surveyOptionsText, setSurveyOptionsText] = useState('Sí\nNo');
+  const [communicationAudience, setCommunicationAudience] =
+    useState<Communication['audience']>('general');
+  const [communicationAthleteId, setCommunicationAthleteId] = useState('');
+  const [communicationTitle, setCommunicationTitle] = useState('');
+  const [communicationMessage, setCommunicationMessage] = useState('');
   const [newAthlete, setNewAthlete] = useState({
     memberNumber: '',
     lastName: '',
@@ -1211,6 +1365,97 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       // Keep the browser copy even if the shared demo API is temporarily unavailable.
     });
   }, [athleteList, hasLoadedSharedAthletes]);
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    fetch('/api/surveys')
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((sharedSurveys: unknown) => {
+        if (ignoreResponse || !Array.isArray(sharedSurveys)) {
+          return;
+        }
+
+        setSurveys(
+          sharedSurveys
+            .map((survey) => normalizeStoredSurvey(survey))
+            .filter((survey): survey is Survey => survey !== null),
+        );
+      })
+      .catch(() => {
+        // Browser-local persistence remains available if the demo API is unavailable.
+      })
+      .finally(() => {
+        if (!ignoreResponse) {
+          setHasLoadedSharedSurveys(true);
+        }
+      });
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    writeStoredSurveys(surveys);
+
+    if (!hasLoadedSharedSurveys) {
+      return;
+    }
+
+    fetch('/api/surveys', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(surveys),
+    }).catch(() => {
+      // Keep the browser copy even if the shared demo API is temporarily unavailable.
+    });
+  }, [surveys, hasLoadedSharedSurveys]);
+
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    fetch('/api/communications')
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((sharedCommunications: unknown) => {
+        if (ignoreResponse || !Array.isArray(sharedCommunications)) {
+          return;
+        }
+
+        setCommunications(
+          sharedCommunications
+            .map((communication) => normalizeStoredCommunication(communication))
+            .filter((communication): communication is Communication => communication !== null),
+        );
+      })
+      .catch(() => {
+        // Browser-local persistence remains available if the demo API is unavailable.
+      })
+      .finally(() => {
+        if (!ignoreResponse) {
+          setHasLoadedSharedCommunications(true);
+        }
+      });
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    writeStoredCommunications(communications);
+
+    if (!hasLoadedSharedCommunications) {
+      return;
+    }
+
+    fetch('/api/communications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(communications),
+    }).catch(() => {
+      // Keep the browser copy even if the shared demo API is temporarily unavailable.
+    });
+  }, [communications, hasLoadedSharedCommunications]);
   const tenantAthleteList = useMemo(
     () => filterByOrganizationId(athleteList, currentOrganizationId),
     [athleteList, currentOrganizationId],
@@ -1228,6 +1473,17 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const canImportPlayers =
     userRole === 'Staff' || userRole === 'Coordinación' || userRole === 'Master';
   const isMasterUser = userRole === 'Master';
+  const surveysForOrganization = useMemo(
+    () => surveys.filter((survey) => survey.organizationId === currentOrganizationId),
+    [surveys, currentOrganizationId],
+  );
+  const communicationsForOrganization = useMemo(
+    () =>
+      communications.filter(
+        (communication) => communication.organizationId === currentOrganizationId,
+      ),
+    [communications, currentOrganizationId],
+  );
   const selectedPlayer =
     tenantAthleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
   const attendancePercentage =
@@ -1414,6 +1670,94 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setUserRole('Jugador');
     setSelectedPlayerId(athlete.id);
     setAuthError(null);
+  };
+
+  const handleSurveySubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const question = surveyQuestion.trim();
+    const options = surveyOptionsText
+      .split(/\r?\n/)
+      .map((option) => option.trim())
+      .filter(Boolean);
+
+    if (!question || options.length < 2) {
+      return;
+    }
+
+    const survey: Survey = {
+      id: Date.now(),
+      organizationId: currentOrganizationId,
+      question,
+      options: options.map((option, index) => ({
+        id: `${Date.now()}-${index}`,
+        label: option,
+        votes: 0,
+      })),
+      createdBy: user?.name ?? translateRole(selectedLanguage, userRole),
+      createdAt: new Date().toISOString(),
+    };
+
+    setSurveys((currentSurveys) => [survey, ...currentSurveys]);
+    setSurveyQuestion('');
+    setSurveyOptionsText('Sí\nNo');
+  };
+
+  const voteSurveyOption = (surveyId: number, optionId: string) => {
+    setSurveys((currentSurveys) =>
+      currentSurveys.map((survey) =>
+        survey.id === surveyId && survey.organizationId === currentOrganizationId
+          ? {
+              ...survey,
+              options: survey.options.map((option) =>
+                option.id === optionId ? { ...option, votes: option.votes + 1 } : option,
+              ),
+            }
+          : survey,
+      ),
+    );
+  };
+
+  const handleCommunicationSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const title = communicationTitle.trim();
+    const message = communicationMessage.trim();
+    const athleteId =
+      communicationAudience === 'individual' ? Number(communicationAthleteId) : undefined;
+
+    if (!title || !message || (communicationAudience === 'individual' && !athleteId)) {
+      return;
+    }
+
+    const communication: Communication = {
+      id: Date.now(),
+      organizationId: currentOrganizationId,
+      audience: communicationAudience,
+      athleteId,
+      title,
+      message,
+      createdBy: user?.name ?? translateRole(selectedLanguage, userRole),
+      createdAt: new Date().toISOString(),
+    };
+
+    setCommunications((currentCommunications) => [communication, ...currentCommunications]);
+    setCommunicationAudience('general');
+    setCommunicationAthleteId('');
+    setCommunicationTitle('');
+    setCommunicationMessage('');
+  };
+
+  const getCommunicationAudienceLabel = (communication: Communication) => {
+    if (communication.audience === 'general') {
+      return 'General para todos';
+    }
+
+    const athlete = tenantAthleteList.find(
+      (currentAthlete) => currentAthlete.id === communication.athleteId,
+    );
+
+    return athlete ? `Individual: ${getAthleteFullName(athlete)}` : 'Individual';
   };
 
   const handleAthleteSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -1959,6 +2303,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           {isPrivilegedUser ? <a href="#control-asistencia">{t('nav.attendance')}</a> : null}
           {isPrivilegedUser ? <a href="#carga-datos">{t('nav.dataEntry')}</a> : null}
           {isPrivilegedUser ? <a href="#listado-jugadores">Listado de jugadores</a> : null}
+          {isPrivilegedUser ? <a href="#encuestas">Encuestas</a> : null}
+          {isPrivilegedUser ? <a href="#comunicaciones">Comunicaciones</a> : null}
           {userRole === 'Jugador' ? <a href="#mi-ficha">{t('nav.myProfile')}</a> : null}
           <a href="#ranking">{t('nav.ranking')}</a>
           {isMasterUser ? <a href="#master-panel">{t('nav.master')}</a> : null}
@@ -2141,6 +2487,176 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
             ) : (
               <p className="athlete-list-empty">No hay jugadores cargados para {preferredSport}.</p>
             )}
+          </div>
+        </section>
+      ) : null}
+
+      {isPrivilegedUser ? (
+        <section className="survey-panel" id="encuestas" aria-labelledby="survey-title">
+          <div className="section-heading">
+            <p className="eyebrow">Participación</p>
+            <h2 id="survey-title">Encuestas</h2>
+            <p>
+              Creá encuestas para el staff del club y visualizá los resultados en tiempo real.
+            </p>
+          </div>
+
+          <div className="collaboration-grid">
+            <form className="collaboration-form" onSubmit={handleSurveySubmit}>
+              <label>
+                Pregunta
+                <input
+                  type="text"
+                  value={surveyQuestion}
+                  onChange={(event) => setSurveyQuestion(event.target.value)}
+                  placeholder="Ej: ¿Confirmamos entrenamiento el sábado?"
+                />
+              </label>
+              <label>
+                Opciones (una por línea)
+                <textarea
+                  value={surveyOptionsText}
+                  onChange={(event) => setSurveyOptionsText(event.target.value)}
+                  rows={4}
+                />
+              </label>
+              <button className="primary-button form-button" type="submit">
+                Crear encuesta
+              </button>
+            </form>
+
+            <div className="collaboration-list" aria-label="Resultados de encuestas">
+              {surveysForOrganization.length > 0 ? (
+                surveysForOrganization.map((survey) => {
+                  const totalVotes = survey.options.reduce((total, option) => total + option.votes, 0);
+
+                  return (
+                    <article className="collaboration-card" key={survey.id}>
+                      <div>
+                        <span className="eyebrow">Encuesta</span>
+                        <h3>{survey.question}</h3>
+                        <small>
+                          Creada por {survey.createdBy} ·{' '}
+                          {new Date(survey.createdAt).toLocaleDateString('es-AR')}
+                        </small>
+                      </div>
+                      <div className="survey-options">
+                        {survey.options.map((option) => {
+                          const percentage =
+                            totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
+
+                          return (
+                            <button
+                              className="survey-option"
+                              type="button"
+                              key={option.id}
+                              onClick={() => voteSurveyOption(survey.id, option.id)}
+                            >
+                              <span>{option.label}</span>
+                              <strong>
+                                {option.votes} voto(s) · {percentage}%
+                              </strong>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </article>
+                  );
+                })
+              ) : (
+                <p className="athlete-list-empty">Todavía no hay encuestas creadas.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {isPrivilegedUser ? (
+        <section
+          className="communication-panel"
+          id="comunicaciones"
+          aria-labelledby="communication-title"
+        >
+          <div className="section-heading">
+            <p className="eyebrow">Mensajes</p>
+            <h2 id="communication-title">Comunicaciones</h2>
+            <p>
+              Enviá comunicados generales para todos o mensajes individuales dirigidos a un jugador.
+            </p>
+          </div>
+
+          <div className="collaboration-grid">
+            <form className="collaboration-form" onSubmit={handleCommunicationSubmit}>
+              <label>
+                Destinatario
+                <select
+                  value={communicationAudience}
+                  onChange={(event) =>
+                    setCommunicationAudience(event.target.value as Communication['audience'])
+                  }
+                >
+                  <option value="general">General para todos</option>
+                  <option value="individual">Individual</option>
+                </select>
+              </label>
+              {communicationAudience === 'individual' ? (
+                <label>
+                  Jugador
+                  <select
+                    value={communicationAthleteId}
+                    onChange={(event) => setCommunicationAthleteId(event.target.value)}
+                  >
+                    <option value="">Seleccionar jugador</option>
+                    {tenantAthleteList.map((athlete) => (
+                      <option value={athlete.id} key={athlete.id}>
+                        {getAthleteFullName(athlete)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <label>
+                Título
+                <input
+                  type="text"
+                  value={communicationTitle}
+                  onChange={(event) => setCommunicationTitle(event.target.value)}
+                  placeholder="Ej: Cambio de horario"
+                />
+              </label>
+              <label>
+                Mensaje
+                <textarea
+                  value={communicationMessage}
+                  onChange={(event) => setCommunicationMessage(event.target.value)}
+                  rows={4}
+                  placeholder="Escribí el comunicado..."
+                />
+              </label>
+              <button className="primary-button form-button" type="submit">
+                Publicar comunicación
+              </button>
+            </form>
+
+            <div className="collaboration-list" aria-label="Comunicaciones publicadas">
+              {communicationsForOrganization.length > 0 ? (
+                communicationsForOrganization.map((communication) => (
+                  <article className="collaboration-card" key={communication.id}>
+                    <div>
+                      <span className="eyebrow">{getCommunicationAudienceLabel(communication)}</span>
+                      <h3>{communication.title}</h3>
+                      <small>
+                        Publicado por {communication.createdBy} ·{' '}
+                        {new Date(communication.createdAt).toLocaleDateString('es-AR')}
+                      </small>
+                    </div>
+                    <p>{communication.message}</p>
+                  </article>
+                ))
+              ) : (
+                <p className="athlete-list-empty">Todavía no hay comunicaciones publicadas.</p>
+              )}
+            </div>
           </div>
         </section>
       ) : null}

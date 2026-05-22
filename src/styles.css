@@ -786,6 +786,8 @@ button {
 
 .data-entry-panel,
 .player-list-panel,
+.survey-panel,
+.communication-panel,
 .report-panel,
 .ranking-panel,
 .operations-panel,
@@ -838,6 +840,90 @@ button {
 .player-list-row span:not(.status) {
   color: #667b6f;
   font-weight: 700;
+}
+
+.collaboration-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.collaboration-form,
+.collaboration-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #edf2ef;
+  border-radius: 22px;
+  background: #fbfdfc;
+}
+
+.collaboration-form label {
+  display: grid;
+  gap: 8px;
+  color: #486154;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.collaboration-form input,
+.collaboration-form select,
+.collaboration-form textarea {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #dce8e1;
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: #102017;
+  background: #fff;
+  font: inherit;
+  outline: none;
+}
+
+.collaboration-form textarea {
+  resize: vertical;
+}
+
+.collaboration-list,
+.survey-options {
+  display: grid;
+  gap: 12px;
+}
+
+.collaboration-card h3 {
+  margin: 4px 0 8px;
+  color: #102017;
+  font-size: 1.2rem;
+}
+
+.collaboration-card p,
+.collaboration-card small {
+  margin: 0;
+  color: #667b6f;
+  line-height: 1.6;
+  font-weight: 700;
+}
+
+.survey-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  border: 1px solid #dce8e1;
+  border-radius: 16px;
+  padding: 10px 14px;
+  color: #102017;
+  background: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.survey-option strong {
+  color: #0f7a3f;
+  white-space: nowrap;
 }
 
 .section-heading > p:not(.eyebrow) {
@@ -1725,6 +1811,7 @@ button {
   .hero,
   .content-grid,
   .metrics-grid,
+  .collaboration-grid,
   .data-form,
   .data-form-expanded,
   .report-filters,
@@ -1851,6 +1938,8 @@ button {
   .metric-card,
   .data-entry-panel,
   .player-list-panel,
+  .survey-panel,
+  .communication-panel,
   .report-panel,
   .ranking-panel,
   .operations-panel,

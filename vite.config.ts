@@ -3,10 +3,12 @@ import react from '@vitejs/plugin-react';
 import fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
-import type { Plugin } from 'vite';
+import type { Plugin, ViteDevServer } from 'vite';
 
 const sharedDataDirectory = path.resolve(process.cwd(), '.sportia-data');
 const sharedAthletesPath = path.join(sharedDataDirectory, 'athletes.json');
+const sharedSurveysPath = path.join(sharedDataDirectory, 'surveys.json');
+const sharedCommunicationsPath = path.join(sharedDataDirectory, 'communications.json');
 
 function readRequestBody(request: IncomingMessage) {
   return new Promise<string>((resolve, reject) => {
@@ -26,53 +28,69 @@ function sendJson(response: ServerResponse, statusCode: number, payload: unknown
   response.end(JSON.stringify(payload));
 }
 
-function sharedAthletesPlugin(): Plugin {
-  return {
-    name: 'sportia-shared-athletes',
-    configureServer(server) {
-      server.middlewares.use('/api/athletes', async (request, response) => {
-        fs.mkdirSync(sharedDataDirectory, { recursive: true });
+function configureSharedJsonEndpoint(
+  server: ViteDevServer,
+  requestPath: string,
+  filePath: string,
+  entityName: string,
+) {
+  server.middlewares.use(requestPath, async (request, response) => {
+      fs.mkdirSync(sharedDataDirectory, { recursive: true });
 
-        if (request.method === 'GET') {
-          if (!fs.existsSync(sharedAthletesPath)) {
-            sendJson(response, 200, []);
+      if (request.method === 'GET') {
+        if (!fs.existsSync(filePath)) {
+          sendJson(response, 200, []);
+          return;
+        }
+
+        response.statusCode = 200;
+        response.setHeader('Content-Type', 'application/json; charset=utf-8');
+        fs.createReadStream(filePath).pipe(response);
+        return;
+      }
+
+      if (request.method === 'PUT') {
+        try {
+          const body = await readRequestBody(request);
+          const parsedBody = JSON.parse(body);
+
+          if (!Array.isArray(parsedBody)) {
+            sendJson(response, 400, { error: `Expected an array of ${entityName}.` });
             return;
           }
 
-          response.statusCode = 200;
-          response.setHeader('Content-Type', 'application/json; charset=utf-8');
-          fs.createReadStream(sharedAthletesPath).pipe(response);
-          return;
+          fs.writeFileSync(filePath, JSON.stringify(parsedBody, null, 2));
+          sendJson(response, 200, { ok: true, count: parsedBody.length });
+        } catch {
+          sendJson(response, 400, { error: `Invalid ${entityName} payload.` });
         }
+        return;
+      }
 
-        if (request.method === 'PUT') {
-          try {
-            const body = await readRequestBody(request);
-            const parsedBody = JSON.parse(body);
+      response.statusCode = 405;
+      response.setHeader('Allow', 'GET, PUT');
+      response.end();
+  });
+}
 
-            if (!Array.isArray(parsedBody)) {
-              sendJson(response, 400, { error: 'Expected an array of athletes.' });
-              return;
-            }
-
-            fs.writeFileSync(sharedAthletesPath, JSON.stringify(parsedBody, null, 2));
-            sendJson(response, 200, { ok: true, count: parsedBody.length });
-          } catch {
-            sendJson(response, 400, { error: 'Invalid athletes payload.' });
-          }
-          return;
-        }
-
-        response.statusCode = 405;
-        response.setHeader('Allow', 'GET, PUT');
-        response.end();
-      });
+function sharedDemoDataPlugin(): Plugin {
+  return {
+    name: 'sportia-shared-demo-data',
+    configureServer(server) {
+      configureSharedJsonEndpoint(server, '/api/athletes', sharedAthletesPath, 'athletes');
+      configureSharedJsonEndpoint(server, '/api/surveys', sharedSurveysPath, 'surveys');
+      configureSharedJsonEndpoint(
+        server,
+        '/api/communications',
+        sharedCommunicationsPath,
+        'communications',
+      );
     },
   };
 }
 
 export default defineConfig({
-  plugins: [react(), sharedAthletesPlugin()],
+  plugins: [react(), sharedDemoDataPlugin()],
   server: {
     allowedHosts: true,
   },
