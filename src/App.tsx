@@ -1344,6 +1344,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [athleteList, setAthleteList] = useState<Athlete[]>(() => readStoredAthletes());
+  const [hasLoadedSharedAthletes, setHasLoadedSharedAthletes] = useState(false);
   const [newAthlete, setNewAthlete] = useState({
     memberNumber: '',
     lastName: '',
@@ -1408,8 +1409,52 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     )[0],
   );
   useEffect(() => {
+    let ignoreResponse = false;
+
+    fetch('/api/athletes')
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((sharedAthletes: unknown) => {
+        if (ignoreResponse || !Array.isArray(sharedAthletes)) {
+          return;
+        }
+
+        const normalizedAthletes = sharedAthletes
+          .map((athlete) => normalizeStoredAthlete(athlete))
+          .filter((athlete): athlete is Athlete => athlete !== null);
+
+        if (normalizedAthletes.length > 0) {
+          setAthleteList(normalizedAthletes);
+        }
+      })
+      .catch(() => {
+        // Browser-local persistence remains available if the demo API is unavailable.
+      })
+      .finally(() => {
+        if (!ignoreResponse) {
+          setHasLoadedSharedAthletes(true);
+        }
+      });
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, []);
+
+  useEffect(() => {
     writeStoredAthletes(athleteList);
-  }, [athleteList]);
+
+    if (!hasLoadedSharedAthletes) {
+      return;
+    }
+
+    fetch('/api/athletes', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(athleteList),
+    }).catch(() => {
+      // Keep the browser copy even if the shared demo API is temporarily unavailable.
+    });
+  }, [athleteList, hasLoadedSharedAthletes]);
   const tenantAthleteList = useMemo(
     () => filterByOrganizationId(athleteList, currentOrganizationId),
     [athleteList, currentOrganizationId],
