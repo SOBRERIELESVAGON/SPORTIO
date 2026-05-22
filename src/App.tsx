@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 type Athlete = {
   id: number;
   name: string;
@@ -52,6 +54,12 @@ const metrics = [
 
 function App() {
   const presentCount = athletes.filter((athlete) => athlete.status === 'Presente').length;
+  const [recipientType, setRecipientType] = useState<'grupo' | 'individual'>('grupo');
+  const [selectedAthleteId, setSelectedAthleteId] = useState<number | null>(null);
+  const [message, setMessage] = useState('');
+  const selectedAthlete = athletes.find((athlete) => athlete.id === selectedAthleteId);
+  const canSendMessage =
+    message.trim().length > 0 && (recipientType === 'grupo' || selectedAthleteId !== null);
 
   return (
     <main className="app-shell">
@@ -64,6 +72,7 @@ function App() {
           <a href="#asistencia">Asistencia</a>
           <a href="#equipos">Equipos</a>
           <a href="#sesiones">Sesiones</a>
+          <a href="#comunicaciones">Comunicaciones</a>
         </div>
       </nav>
 
@@ -149,6 +158,89 @@ function App() {
             Empezar carga
           </a>
         </div>
+      </section>
+
+      <section className="panel communication-panel" id="comunicaciones">
+        <div className="section-heading">
+          <p className="eyebrow">Comunicaciones</p>
+          <h2>Enviar aviso al equipo o a un jugador</h2>
+        </div>
+        <form className="communication-form">
+          <fieldset className="recipient-options">
+            <legend>Destinatario</legend>
+            <label htmlFor="recipient-group">
+              <input
+                id="recipient-group"
+                type="radio"
+                name="recipient"
+                checked={recipientType === 'grupo'}
+                onChange={() => {
+                  setRecipientType('grupo');
+                  setSelectedAthleteId(null);
+                }}
+              />
+              Grupo completo
+            </label>
+            <label htmlFor="recipient-individual">
+              <input
+                id="recipient-individual"
+                type="radio"
+                name="recipient"
+                checked={recipientType === 'individual'}
+                onChange={() => setRecipientType('individual')}
+              />
+              Individual
+            </label>
+          </fieldset>
+
+          {recipientType === 'individual' && (
+            <div className="player-picker" aria-label="Seleccion de jugador">
+              <p>Jugadores disponibles</p>
+              <div className="player-picker-list" role="listbox" aria-label="Listado de jugadores">
+                {athletes.map((athlete) => {
+                  const isSelected = athlete.id === selectedAthleteId;
+                  return (
+                    <button
+                      className={`player-option ${isSelected ? 'selected' : ''}`}
+                      key={athlete.id}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => setSelectedAthleteId(athlete.id)}
+                    >
+                      <strong>{athlete.name}</strong>
+                      <span>{athlete.sport}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <label className="message-field" htmlFor="message">
+            Mensaje
+            <textarea
+              id="message"
+              name="message"
+              rows={4}
+              placeholder="Escribe la comunicacion para el destinatario seleccionado"
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+            />
+          </label>
+
+          <div className="communication-footer">
+            <button className="primary-button send-button" type="button" disabled={!canSendMessage}>
+              Enviar comunicacion
+            </button>
+            <p className="communication-note">
+              {recipientType === 'individual'
+                ? selectedAthlete
+                  ? `Recibe: ${selectedAthlete.name}`
+                  : 'Selecciona un jugador para continuar.'
+                : 'Recibe: todo el equipo.'}
+            </p>
+          </div>
+        </form>
       </section>
     </main>
   );
