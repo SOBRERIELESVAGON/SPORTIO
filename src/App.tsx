@@ -1963,7 +1963,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           <a href="#ranking">{t('nav.ranking')}</a>
           {isMasterUser ? <a href="#master-panel">{t('nav.master')}</a> : null}
           {isPrivilegedUser ? <a href="#reportes">{t('nav.reports')}</a> : null}
-          {isPrivilegedUser ? <a href="#equipos">{t('nav.teams')}</a> : null}
         </div>
         <div className="user-menu">
           <LanguageSelector
@@ -3201,18 +3200,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         <p className="report-note">{t('report.note')}</p>
       </section>
 
-      <section className="content-grid single-panel-grid">
-        <div className="panel accent-panel" id="equipos">
-          <p className="eyebrow">{t('panel.eyebrow')}</p>
-          <h2>{t('panel.title')}</h2>
-          <p>
-            {t('panel.desc')}
-          </p>
-          <a className="secondary-button light" href="#carga-datos">
-            {t('panel.start')}
-          </a>
-        </div>
-      </section>
         </>
       ) : null}
       <AdSlot
