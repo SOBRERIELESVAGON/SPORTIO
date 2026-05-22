@@ -1185,26 +1185,6 @@ button {
   font-weight: 800;
 }
 
-.import-photo-preview {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-}
-
-.import-photo-preview img {
-  width: 100%;
-  max-height: 220px;
-  object-fit: cover;
-  border-radius: 16px;
-  border: 1px solid #e3ece7;
-}
-
-.import-photo-preview figcaption {
-  color: #667b6f;
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
 .manual-entry-heading {
   margin-top: 22px;
   padding: 18px 20px;

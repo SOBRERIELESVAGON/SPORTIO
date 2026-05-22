@@ -26,7 +26,6 @@ import {
 import {
   downloadPlayerImportTemplate,
   parseSpreadsheetFile,
-  recognizePlayerFromImage,
   type PlayerImportData,
 } from './playerImport';
 import {
@@ -463,41 +462,6 @@ function athleteFromImportData(
   };
 }
 
-function importDataToFormState(data: PlayerImportData, preferredSport: string) {
-  return {
-    memberNumber: data.memberNumber,
-    lastName: data.lastName,
-    firstName: data.firstName,
-    dni: data.dni,
-    address: data.address,
-    birthDate: data.birthDate,
-    age: data.age,
-    playerPhone: data.playerPhone,
-    fatherPhone: data.fatherPhone,
-    motherPhone: data.motherPhone,
-    email: data.email,
-    healthInsurance: data.healthInsurance,
-    healthInsuranceNumber: data.healthInsuranceNumber,
-    paymentMethod: data.paymentMethod,
-    memberStatus: data.memberStatus,
-    membershipType: data.membershipType,
-    nextBillingDate: data.nextBillingDate,
-    sport: data.sport || preferredSport,
-    team: data.team,
-    cohort: data.cohort,
-    perfectAttendance30Days: data.perfectAttendance30Days,
-    trainingsAttended: String(data.trainingsAttended),
-    trainingsTotal: String(data.trainingsTotal),
-    matchesAttended: String(data.matchesAttended),
-    matchesTotal: String(data.matchesTotal),
-    toursAttended: String(data.toursAttended),
-    toursTotal: String(data.toursTotal),
-    stayedAsGuest: data.stayedAsGuest,
-    hostedGuest: data.hostedGuest,
-    status: data.status,
-  };
-}
-
 function readStoredValue(key: string) {
   try {
     return window.localStorage.getItem(key);
@@ -730,209 +694,7 @@ function AdSlot({
   );
 }
 
-const initialAthletes: Athlete[] = ([
-  {
-    id: 1,
-    memberNumber: '4613',
-    lastName: 'MENDIVIL',
-    firstName: 'BENICIO',
-    dni: '60.910.046',
-    address: 'Avenida Paraguay 526, Salta',
-    birthDate: '27/02/2018',
-    age: '8',
-    playerPhone: '3874098343',
-    fatherPhone: '3875001001',
-    motherPhone: '3875001002',
-    email: 'natalia.valdez1317@gmail.com',
-    healthInsurance: 'OSDE',
-    healthInsuranceNumber: '2-4613-08',
-    paymentMethod: 'Mercado Pago',
-    memberStatus: 'Activo',
-    membershipType: 'Menor familia',
-    nextBillingDate: '30/04/2026',
-    sport: 'Rugby',
-    team: 'Rugby M8',
-    cohort: 'Camada 2018',
-    perfectAttendance30Days: true,
-    trainingsAttended: 12,
-    trainingsTotal: 12,
-    matchesAttended: 4,
-    matchesTotal: 4,
-    toursAttended: 1,
-    toursTotal: 1,
-    stayedAsGuest: true,
-    hostedGuest: true,
-    status: 'Presente',
-  },
-  {
-    id: 2,
-    memberNumber: '4614',
-    lastName: 'MENDEZ',
-    firstName: 'LUCIA',
-    dni: '54.128.882',
-    address: 'Las Heras 120, Salta',
-    birthDate: '14/08/2011',
-    age: '14',
-    playerPhone: '3875551234',
-    fatherPhone: '3875551200',
-    motherPhone: '3875551201',
-    email: 'lucia.mendez@example.com',
-    healthInsurance: 'Swiss Medical',
-    healthInsuranceNumber: 'SM-54128882',
-    paymentMethod: 'Transferencia',
-    memberStatus: 'Activo',
-    membershipType: 'Jugador juvenil',
-    nextBillingDate: '30/04/2026',
-    sport: 'Fútbol',
-    team: 'Fútbol Sub 14',
-    cohort: 'Camada 2011',
-    perfectAttendance30Days: true,
-    trainingsAttended: 11,
-    trainingsTotal: 12,
-    matchesAttended: 3,
-    matchesTotal: 4,
-    toursAttended: 1,
-    toursTotal: 1,
-    stayedAsGuest: false,
-    hostedGuest: true,
-    status: 'Presente',
-  },
-  {
-    id: 3,
-    memberNumber: '4618',
-    lastName: 'GIMENEZ',
-    firstName: 'VALENTINA',
-    dni: '53.118.904',
-    address: 'España 1550, Salta',
-    birthDate: '18/03/2011',
-    age: '14',
-    playerPhone: '3875558800',
-    fatherPhone: '3875558801',
-    motherPhone: '3875558802',
-    email: 'valentina.gimenez@example.com',
-    healthInsurance: 'Sancor Salud',
-    healthInsuranceNumber: 'SS-53118904',
-    paymentMethod: 'Transferencia',
-    memberStatus: 'Activo',
-    membershipType: 'Jugadora juvenil',
-    nextBillingDate: '30/04/2026',
-    sport: 'Fútbol',
-    team: 'Fútbol Sub 14',
-    cohort: 'Camada 2011',
-    perfectAttendance30Days: false,
-    trainingsAttended: 10,
-    trainingsTotal: 12,
-    matchesAttended: 2,
-    matchesTotal: 4,
-    toursAttended: 0,
-    toursTotal: 1,
-    stayedAsGuest: false,
-    hostedGuest: false,
-    status: 'Presente',
-  },
-  {
-    id: 4,
-    memberNumber: '4615',
-    lastName: 'ROJAS',
-    firstName: 'MATEO',
-    dni: '52.443.219',
-    address: 'Belgrano 880, Salta',
-    birthDate: '03/11/2010',
-    age: '15',
-    playerPhone: '3875556778',
-    fatherPhone: '3875556700',
-    motherPhone: '3875556701',
-    email: 'mateo.rojas@example.com',
-    healthInsurance: 'Galeno',
-    healthInsuranceNumber: 'GA-52443219',
-    paymentMethod: 'Efectivo',
-    memberStatus: 'Activo',
-    membershipType: 'Jugador juvenil',
-    nextBillingDate: '30/04/2026',
-    sport: 'Básquet',
-    team: 'Básquet Sub 15',
-    cohort: 'Camada 2010',
-    perfectAttendance30Days: false,
-    trainingsAttended: 9,
-    trainingsTotal: 12,
-    matchesAttended: 4,
-    matchesTotal: 5,
-    toursAttended: 1,
-    toursTotal: 1,
-    stayedAsGuest: true,
-    hostedGuest: false,
-    status: 'Presente',
-  },
-  {
-    id: 5,
-    memberNumber: '4616',
-    lastName: 'ARIAS',
-    firstName: 'SOFIA',
-    dni: '53.887.102',
-    address: 'San Martin 410, Salta',
-    birthDate: '22/05/2012',
-    age: '13',
-    playerPhone: '3875554321',
-    fatherPhone: '3875554300',
-    motherPhone: '3875554301',
-    email: 'sofia.arias@example.com',
-    healthInsurance: 'Medife',
-    healthInsuranceNumber: 'ME-53887102',
-    paymentMethod: 'Debito automatico',
-    memberStatus: 'Activo',
-    membershipType: 'Jugadora juvenil',
-    nextBillingDate: '30/04/2026',
-    sport: 'Vóley',
-    team: 'Vóley Sub 13',
-    cohort: 'Camada 2012',
-    perfectAttendance30Days: false,
-    trainingsAttended: 8,
-    trainingsTotal: 12,
-    matchesAttended: 2,
-    matchesTotal: 4,
-    toursAttended: 1,
-    toursTotal: 1,
-    stayedAsGuest: false,
-    hostedGuest: false,
-    status: 'Presente',
-  },
-  {
-    id: 6,
-    memberNumber: '4617',
-    lastName: 'FERRERO',
-    firstName: 'TOMAS',
-    dni: '55.102.441',
-    address: 'Mitre 220, Salta',
-    birthDate: '09/02/2009',
-    age: '17',
-    playerPhone: '3875559988',
-    fatherPhone: '3875559900',
-    motherPhone: '3875559901',
-    email: 'tomas.ferrero@example.com',
-    healthInsurance: 'OSDE',
-    healthInsuranceNumber: 'OS-55102441',
-    paymentMethod: 'Debito automatico',
-    memberStatus: 'Activo',
-    membershipType: 'Jugador juvenil',
-    nextBillingDate: '30/04/2026',
-    sport: 'Rugby',
-    team: 'Rugby M17',
-    cohort: 'Camada 2009',
-    perfectAttendance30Days: true,
-    trainingsAttended: 12,
-    trainingsTotal: 12,
-    matchesAttended: 5,
-    matchesTotal: 5,
-    toursAttended: 2,
-    toursTotal: 2,
-    stayedAsGuest: false,
-    hostedGuest: true,
-    status: 'Presente',
-  },
-] satisfies Omit<Athlete, 'organizationId'>[]).map((athlete) => ({
-  ...athlete,
-  organizationId: DEFAULT_ORGANIZATION_ID,
-}));
+const initialAthletes: Athlete[] = [];
 
 function isAttendanceStatus(value: unknown): value is AttendanceStatus {
   return value === 'Presente' || value === 'Ausente';
@@ -1379,12 +1141,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   });
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [importLoading, setImportLoading] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
   const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const spreadsheetInputRef = useRef<HTMLInputElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const playersTableRef = useRef<HTMLDivElement>(null);
   const [spreadsheetFileName, setSpreadsheetFileName] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>(
@@ -1422,9 +1180,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           .map((athlete) => normalizeStoredAthlete(athlete))
           .filter((athlete): athlete is Athlete => athlete !== null);
 
-        if (normalizedAthletes.length > 0) {
-          setAthleteList(normalizedAthletes);
-        }
+        setAthleteList(normalizedAthletes);
       })
       .catch(() => {
         // Browser-local persistence remains available if the demo API is unavailable.
@@ -1793,19 +1549,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     return { addedCount, duplicateCount };
   };
 
-  const clearPhotoSelection = () => {
-    if (photoPreviewUrl) {
-      URL.revokeObjectURL(photoPreviewUrl);
-    }
-
-    setPhotoPreviewUrl(null);
-    setPhotoFile(null);
-
-    if (photoInputRef.current) {
-      photoInputRef.current.value = '';
-    }
-  };
-
   const scrollToPlayersTable = () => {
     window.setTimeout(() => {
       playersTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1875,76 +1618,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     } finally {
       setImportLoading(false);
       event.target.value = '';
-    }
-  };
-
-  const handlePhotoSelect = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    if (photoPreviewUrl) {
-      URL.revokeObjectURL(photoPreviewUrl);
-    }
-
-    setPhotoFile(file);
-    setPhotoPreviewUrl(URL.createObjectURL(file));
-    setImportMessage(null);
-  };
-
-  const handlePhotoImport = async () => {
-    if (!photoFile) {
-      setImportMessage(t('import.selectPhoto'));
-      return;
-    }
-
-    setImportLoading(true);
-    setImportProgress(0);
-    setImportMessage(null);
-
-    try {
-      const extracted = await recognizePlayerFromImage(
-        photoFile,
-        preferredSport,
-        setImportProgress,
-      );
-
-      if (
-        !extracted.lastName.trim() ||
-        !extracted.firstName.trim() ||
-        !extracted.dni.trim()
-      ) {
-        setNewAthlete((current) => ({
-          ...current,
-          ...importDataToFormState(extracted, preferredSport),
-        }));
-        setImportMessage(t('import.partial'));
-        return;
-      }
-
-      const { addedCount, duplicateCount } = addImportedPlayers([extracted]);
-
-      if (addedCount === 0 && duplicateCount > 0) {
-        setImportMessage(
-          `El jugador ${extracted.lastName.toUpperCase()} ${extracted.firstName.toUpperCase()} ya existe. Se mantiene el registro anterior.`,
-        );
-        return;
-      }
-
-      setImportMessage(
-        t('import.fromPhoto', {
-          name: `${extracted.lastName.toUpperCase()} ${extracted.firstName.toUpperCase()}`,
-        }),
-      );
-      clearPhotoSelection();
-      setSaveMessage(null);
-    } catch {
-      setImportMessage(t('import.photoError'));
-    } finally {
-      setImportLoading(false);
-      setImportProgress(0);
     }
   };
 
@@ -2900,46 +2573,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                 ) : null}
               </article>
 
-              <article className="import-card">
-                <strong>{t('import.photoTitle')}</strong>
-                <p>
-                  {t('import.photoDesc')}
-                </p>
-                <div className="import-buttons">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={importLoading}
-                    onClick={() => photoInputRef.current?.click()}
-                  >
-                    {t('import.choosePhoto')}
-                  </button>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    disabled={importLoading || !photoFile}
-                    onClick={handlePhotoImport}
-                  >
-                    {importLoading && photoFile
-                      ? t('import.readingPhoto', { progress: importProgress })
-                      : t('import.extractPhoto')}
-                  </button>
-                </div>
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  hidden
-                  onChange={handlePhotoSelect}
-                />
-                {photoPreviewUrl ? (
-                  <figure className="import-photo-preview">
-                    <img src={photoPreviewUrl} alt={t('import.previewAlt')} />
-                    <figcaption>{t('import.previewCaption')}</figcaption>
-                  </figure>
-                ) : null}
-              </article>
             </div>
 
             {importMessage ? (

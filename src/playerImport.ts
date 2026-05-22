@@ -1,4 +1,3 @@
-import { createWorker } from 'tesseract.js';
 import * as XLSX from 'xlsx';
 
 export type PlayerImportData = {
@@ -594,74 +593,4 @@ export async function parseSpreadsheetFile(
   });
 
   return { players, skipped, missingRequiredColumns: validSheetCount === 0 };
-}
-
-function extractLabeledValue(text: string, labels: string[]) {
-  for (const label of labels) {
-    const pattern = new RegExp(`${label}\\s*[:\\-]?\\s*([^\\n\\r,;]{2,80})`, 'iu');
-    const match = text.match(pattern);
-
-    if (match?.[1]) {
-      return match[1].trim();
-    }
-  }
-
-  return '';
-}
-
-export function extractPlayerFromOcrText(text: string, defaultSport: string): PlayerImportData {
-  const player = emptyPlayerImportData();
-  const compactText = text.replace(/\s+/g, ' ').trim();
-
-  player.lastName = extractLabeledValue(compactText, ['apellido', 'apellidos']).toUpperCase();
-  player.firstName = extractLabeledValue(compactText, ['nombre', 'nombres']).toUpperCase();
-  player.dni =
-    extractLabeledValue(compactText, ['dni', 'documento']) ||
-    (compactText.match(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\b/)?.[0] ?? '');
-  player.memberNumber = extractLabeledValue(compactText, ['nro socio', 'numero socio', 'socio']);
-  player.address = extractLabeledValue(compactText, ['domicilio', 'direccion']);
-  player.birthDate = extractLabeledValue(compactText, ['fecha nacimiento', 'fecha de nacimiento']);
-  player.age = extractLabeledValue(compactText, ['edad']);
-  player.playerPhone =
-    extractLabeledValue(compactText, ['celular jugador', 'telefono jugador', 'celular']) ||
-    (compactText.match(/(?:\+?54)?\s?(?:9\s?)?(?:11|[2368]\d)\s?\d{3,4}[-\s]?\d{4}/)?.[0] ?? '');
-  player.fatherPhone = extractLabeledValue(compactText, ['celular padre', 'telefono padre']);
-  player.motherPhone = extractLabeledValue(compactText, ['celular madre', 'telefono madre']);
-  player.email =
-    extractLabeledValue(compactText, ['email', 'mail']) ||
-    (compactText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? '');
-  player.healthInsurance = extractLabeledValue(compactText, ['obra social']);
-  player.healthInsuranceNumber = extractLabeledValue(compactText, [
-    'numero obra social',
-    'nro obra social',
-  ]);
-  player.paymentMethod = extractLabeledValue(compactText, ['forma de pago']);
-  player.membershipType = extractLabeledValue(compactText, ['tipo socio']);
-  player.team = extractLabeledValue(compactText, ['equipo']);
-  player.cohort = extractLabeledValue(compactText, ['camada']);
-  player.sport = extractLabeledValue(compactText, ['deporte']) || defaultSport;
-
-  return player;
-}
-
-export async function recognizePlayerFromImage(
-  file: File,
-  defaultSport: string,
-  onProgress?: (progress: number) => void,
-): Promise<PlayerImportData> {
-  const worker = await createWorker('spa', 1, {
-    logger: (message) => {
-      if (message.status === 'recognizing text' && typeof message.progress === 'number') {
-        onProgress?.(Math.round(message.progress * 100));
-      }
-    },
-  });
-
-  try {
-    const { data } = await worker.recognize(file);
-
-    return extractPlayerFromOcrText(data.text, defaultSport);
-  } finally {
-    await worker.terminate();
-  }
 }
