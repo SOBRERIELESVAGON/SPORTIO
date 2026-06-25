@@ -256,6 +256,7 @@ button {
 
 .language-selector,
 .organization-selector,
+.group-preference-selector,
 .sport-preference-selector {
   display: grid;
   gap: 2px;
@@ -268,6 +269,7 @@ button {
 .language-selector select,
 .organization-selector select,
 .organization-create-form input,
+.group-preference-selector select,
 .sport-preference-selector select {
   min-height: 32px;
   border: 1px solid #dce8e1;
@@ -318,6 +320,7 @@ button {
 
 .login-language-row .language-selector,
 .login-language-row .organization-selector,
+.login-language-row .group-preference-selector,
 .login-language-row .sport-preference-selector {
   width: min(220px, 100%);
 }
@@ -325,6 +328,7 @@ button {
 .login-language-row .language-selector select,
 .login-language-row .organization-selector select,
 .login-language-row .organization-create-form input,
+.login-language-row .group-preference-selector select,
 .login-language-row .sport-preference-selector select {
   min-height: 42px;
   border-radius: 14px;

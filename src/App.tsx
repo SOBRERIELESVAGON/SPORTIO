@@ -179,9 +179,11 @@ const sportOptions = [
 ];
 
 const ALL_SPORTS_VALUE = '__all_sports__';
+const ALL_GROUPS_VALUE = '__all_groups__';
 const rememberedRoleKey = 'sportia.rememberedRole';
 const rememberedPasswordKey = 'sportia.rememberedPassword';
 const preferredSportKey = 'sportia.preferredSport';
+const preferredGroupKey = 'sportia.preferredGroup';
 const organizationOptionsKey = 'sportia.organizations';
 const preferredOrganizationKey = 'sportia.preferredOrganization';
 const athleteListStorageKey = 'sportia.athletes';
@@ -346,6 +348,10 @@ function filterAthletesBySport(athletes: Athlete[], sport: string) {
   return sport === ALL_SPORTS_VALUE ? athletes : athletes.filter((athlete) => athlete.sport === sport);
 }
 
+function getCohortShortLabel(cohort: string) {
+  return cohort.replace(/^camada\s*/i, '').trim();
+}
+
 function getDivisionFromTeam(team: string) {
   const trimmedTeam = team.trim();
 
@@ -370,6 +376,55 @@ function getDivisionFromTeam(team: string) {
   }
 
   return trimmedTeam;
+}
+
+function getAthleteGroupCandidates(athlete: Pick<Athlete, 'team' | 'cohort'>) {
+  const candidates = new Set<string>();
+  const team = athlete.team.trim();
+  const cohort = athlete.cohort.trim();
+  const division = getDivisionFromTeam(team);
+
+  if (team) {
+    candidates.add(team);
+  }
+
+  if (cohort) {
+    candidates.add(cohort);
+  }
+
+  if (division) {
+    candidates.add(division);
+  }
+
+  if (team && cohort) {
+    const shortCohort = getCohortShortLabel(cohort);
+    const normalizedTeam = normalizeDuplicateKeyPart(team);
+    const normalizedCohort = normalizeDuplicateKeyPart(cohort);
+    const normalizedShortCohort = normalizeDuplicateKeyPart(shortCohort);
+
+    if (
+      (!normalizedCohort || !normalizedTeam.includes(normalizedCohort)) &&
+      (!normalizedShortCohort || !normalizedTeam.includes(normalizedShortCohort))
+    ) {
+      candidates.add(shortCohort ? `${team} ${shortCohort}` : `${team} ${cohort}`);
+    }
+  }
+
+  return Array.from(candidates);
+}
+
+function getGroupFilterOptions(athletes: Athlete[]) {
+  return Array.from(
+    new Set(athletes.flatMap((athlete) => getAthleteGroupCandidates(athlete)).filter(Boolean)),
+  ).sort((left, right) => left.localeCompare(right, 'es'));
+}
+
+function filterAthletesByGroup(athletes: Athlete[], group: string) {
+  if (group === ALL_GROUPS_VALUE) {
+    return athletes;
+  }
+
+  return athletes.filter((athlete) => getAthleteGroupCandidates(athlete).includes(group));
 }
 
 function getReportGroupOptions(
@@ -673,6 +728,30 @@ function SportPreferenceSelector({
         {sportOptions.map((sport) => (
           <option value={sport} key={sport}>
             {sport}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function GroupPreferenceSelector({
+  groupOptions,
+  selectedGroup,
+  onGroupChange,
+}: {
+  groupOptions: string[];
+  selectedGroup: string;
+  onGroupChange: (group: string) => void;
+}) {
+  return (
+    <label className="group-preference-selector">
+      Equipo / Camada / División
+      <select value={selectedGroup} onChange={(event) => onGroupChange(event.target.value)}>
+        <option value={ALL_GROUPS_VALUE}>Todos los grupos</option>
+        {groupOptions.map((group) => (
+          <option value={group} key={group}>
+            {group}
           </option>
         ))}
       </select>
@@ -1050,8 +1129,11 @@ function LoginScreen({
   onLanguageChange,
   onOrganizationChange,
   onOrganizationCreate,
+  onPreferredGroupChange,
   onPreferredSportChange,
+  groupOptions,
   organizations,
+  preferredGroup,
   preferredSport,
   selectedOrganizationId,
   selectedLanguage,
@@ -1066,8 +1148,11 @@ function LoginScreen({
   onLanguageChange: (language: LanguageCode) => void;
   onOrganizationChange: (organizationId: OrganizationId) => void;
   onOrganizationCreate: (organizationName: string) => void;
+  onPreferredGroupChange: (group: string) => void;
   onPreferredSportChange: (sport: string) => void;
+  groupOptions: string[];
   organizations: OrganizationOption[];
+  preferredGroup: string;
   preferredSport: string;
   selectedOrganizationId: OrganizationId;
   selectedLanguage: LanguageCode;
@@ -1135,6 +1220,11 @@ function LoginScreen({
             selectedSport={preferredSport}
             onSportChange={onPreferredSportChange}
             t={t}
+          />
+          <GroupPreferenceSelector
+            groupOptions={groupOptions}
+            selectedGroup={preferredGroup}
+            onGroupChange={onPreferredGroupChange}
           />
         </div>
 
@@ -1294,6 +1384,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setSelectedPlayerId(null);
     setSelectedDeleteIds([]);
     setAthleteUndoStack([]);
+    setPreferredGroup(ALL_GROUPS_VALUE);
+    writeStoredValue(preferredGroupKey, ALL_GROUPS_VALUE);
   };
 
   const handleOrganizationCreate = (organizationName: string) => {
@@ -1318,6 +1410,9 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     const storedSport = readStoredValue(preferredSportKey);
 
     return storedSport && sportOptions.includes(storedSport) ? storedSport : sportOptions[0];
+  });
+  const [preferredGroup, setPreferredGroup] = useState(() => {
+    return readStoredValue(preferredGroupKey) ?? ALL_GROUPS_VALUE;
   });
   const [userRole, setUserRole] = useState<UserRole>('Jugador');
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
@@ -1594,9 +1689,21 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     () => filterByOrganizationId(athleteList, currentOrganizationId),
     [athleteList, currentOrganizationId],
   );
-  const athletesForView = useMemo(
-    () => tenantAthleteList.filter((athlete) => athlete.sport === preferredSport),
+  const athletesForPreferredSport = useMemo(
+    () => filterAthletesBySport(tenantAthleteList, preferredSport),
     [tenantAthleteList, preferredSport],
+  );
+  const groupFilterOptions = useMemo(
+    () => getGroupFilterOptions(athletesForPreferredSport),
+    [athletesForPreferredSport],
+  );
+  const normalizedPreferredGroup =
+    preferredGroup === ALL_GROUPS_VALUE || groupFilterOptions.includes(preferredGroup)
+      ? preferredGroup
+      : ALL_GROUPS_VALUE;
+  const athletesForView = useMemo(
+    () => filterAthletesByGroup(athletesForPreferredSport, normalizedPreferredGroup),
+    [athletesForPreferredSport, normalizedPreferredGroup],
   );
   const presentCount = athletesForView.filter((athlete) => athlete.status === 'Presente').length;
   const absentAthletesForQuickList = useMemo(
@@ -1784,6 +1891,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const handlePreferredSportChange = (sport: string) => {
     setPreferredSport(sport);
     writeStoredValue(preferredSportKey, sport);
+    setPreferredGroup(ALL_GROUPS_VALUE);
+    writeStoredValue(preferredGroupKey, ALL_GROUPS_VALUE);
     setReportSport(sport);
     setRankingSport(sport);
     setNewAthlete((currentAthlete) => ({ ...currentAthlete, sport }));
@@ -1797,6 +1906,13 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     );
 
     setReportTarget(nextTargetOptions[0]);
+  };
+
+  const handlePreferredGroupChange = (group: string) => {
+    setPreferredGroup(group);
+    writeStoredValue(preferredGroupKey, group);
+    setSelectedPlayerId(null);
+    setSelectedDeleteIds([]);
   };
 
   const handlePlayerAccess = (athleteId: number) => {
@@ -2463,11 +2579,14 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         onLanguageChange={handleLanguageChange}
         onOrganizationChange={handleOrganizationChange}
         onOrganizationCreate={handleOrganizationCreate}
+        onPreferredGroupChange={handlePreferredGroupChange}
         t={t}
         onPreferredSportChange={handlePreferredSportChange}
+        groupOptions={groupFilterOptions}
         onPlayerAccess={handlePlayerAccess}
         onStaffAccess={handleStaffAccess}
         organizations={organizations}
+        preferredGroup={normalizedPreferredGroup}
         preferredSport={preferredSport}
         selectedOrganizationId={currentOrganizationId}
         selectedLanguage={selectedLanguage}
@@ -2510,6 +2629,11 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
             selectedSport={preferredSport}
             onSportChange={handlePreferredSportChange}
             t={t}
+          />
+          <GroupPreferenceSelector
+            groupOptions={groupFilterOptions}
+            selectedGroup={normalizedPreferredGroup}
+            onGroupChange={handlePreferredGroupChange}
           />
           {user.picture ? (
             <img className="user-avatar" src={user.picture} alt="" referrerPolicy="no-referrer" />
