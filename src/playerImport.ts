@@ -1,4 +1,3 @@
-import { createWorker } from 'tesseract.js';
 import * as XLSX from 'xlsx';
 
 export type PlayerImportData = {
@@ -40,6 +39,8 @@ export const PLAYER_IMPORT_HEADERS = [
   'Nombre',
   'DNI',
   'Deporte',
+  'Actividad',
+  'Cat. Actividad',
   'Equipo',
   'Camada',
   'Asistencia',
@@ -67,18 +68,53 @@ export const PLAYER_IMPORT_HEADERS = [
   'Proximo cobro',
 ] as const;
 
-const headerFieldMap: Record<string, keyof PlayerImportData> = {
+type ImportColumnField =
+  | keyof PlayerImportData
+  | 'activity'
+  | 'activityCategory'
+  | 'category'
+  | 'fullNameLastFirst'
+  | 'fullNameFirstLast';
+
+const headerFieldMap: Record<string, ImportColumnField> = {
   'nro socio': 'memberNumber',
+  'n socio': 'memberNumber',
+  'num socio': 'memberNumber',
   'numero socio': 'memberNumber',
+  socio: 'memberNumber',
   apellido: 'lastName',
   apellidos: 'lastName',
   nombre: 'firstName',
   nombres: 'firstName',
+  'apellido nombre': 'fullNameLastFirst',
+  'apellido y nombre': 'fullNameLastFirst',
+  'apellidos y nombres': 'fullNameLastFirst',
+  'nombre apellido': 'fullNameFirstLast',
+  'nombre y apellido': 'fullNameFirstLast',
+  'nombres y apellidos': 'fullNameFirstLast',
+  jugador: 'fullNameLastFirst',
+  deportista: 'fullNameLastFirst',
   dni: 'dni',
   documento: 'dni',
+  'nro documento': 'dni',
+  'numero documento': 'dni',
   deporte: 'sport',
+  disciplina: 'sport',
+  actividad: 'activity',
+  'cat actividad': 'activityCategory',
+  'cat. actividad': 'activityCategory',
+  'categoria actividad': 'activityCategory',
+  'categoria de actividad': 'activityCategory',
+  'categoria/actividad': 'activityCategory',
+  categoria: 'category',
+  'categoria deportiva': 'category',
+  cat: 'category',
   equipo: 'team',
+  grupo: 'team',
+  division: 'team',
+  'división': 'team',
   camada: 'cohort',
+  cohorte: 'cohort',
   asistencia: 'status',
   'medalla asistencia perfecta 30 dias': 'perfectAttendance30Days',
   'entrenamientos asistidos': 'trainingsAttended',
@@ -190,6 +226,64 @@ function parseAttendanceStatus(value: string): PlayerImportData['status'] {
   return value.toLowerCase().includes('ausent') ? 'Ausente' : 'Presente';
 }
 
+function normalizedText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
+function findSportInText(value: string, sportOptions: string[]) {
+  const normalizedValue = normalizedText(value);
+
+  return sportOptions.find((sport) => normalizedValue.includes(normalizedText(sport)));
+}
+
+function normalizeSport(value: string, sportOptions: string[]) {
+  const normalizedValue = normalizedText(value);
+
+  return (
+    sportOptions.find((sport) => normalizedText(sport) === normalizedValue) ??
+    findSportInText(value, sportOptions) ??
+    ''
+  );
+}
+
+function splitFullName(value: string, order: 'lastFirst' | 'firstLast') {
+  const normalizedValue = value.replace(/\s+/g, ' ').trim();
+
+  if (!normalizedValue) {
+    return { firstName: '', lastName: '' };
+  }
+
+  const commaParts = normalizedValue.split(',').map((part) => part.trim()).filter(Boolean);
+
+  if (commaParts.length >= 2) {
+    return { lastName: commaParts[0], firstName: commaParts.slice(1).join(' ') };
+  }
+
+  const parts = normalizedValue.split(' ').filter(Boolean);
+
+  if (parts.length === 1) {
+    return order === 'lastFirst'
+      ? { lastName: parts[0], firstName: '' }
+      : { firstName: parts[0], lastName: '' };
+  }
+
+  if (order === 'firstLast') {
+    return {
+      firstName: parts.slice(0, -1).join(' '),
+      lastName: parts.at(-1) ?? '',
+    };
+  }
+
+  return {
+    lastName: parts[0],
+    firstName: parts.slice(1).join(' '),
+  };
+}
+
 function emptyPlayerImportData(): PlayerImportData {
   return {
     memberNumber: '',
@@ -255,6 +349,54 @@ function applyFieldValue(player: PlayerImportData, field: keyof PlayerImportData
   }
 }
 
+function applySpecialFieldValue(
+  player: PlayerImportData,
+  field: Exclude<ImportColumnField, keyof PlayerImportData>,
+  rawValue: string,
+  sportOptions: string[],
+) {
+  if (!rawValue) {
+    return;
+  }
+
+  if (field === 'fullNameLastFirst' || field === 'fullNameFirstLast') {
+    const name = splitFullName(rawValue, field === 'fullNameLastFirst' ? 'lastFirst' : 'firstLast');
+
+    player.lastName ||= name.lastName;
+    player.firstName ||= name.firstName;
+    return;
+  }
+
+  if (field === 'activity') {
+    const sport = normalizeSport(rawValue, sportOptions);
+    player.sport ||= sport || rawValue;
+    return;
+  }
+
+  if (field === 'category') {
+    player.cohort ||= rawValue;
+    player.team ||= player.sport ? `${player.sport} ${rawValue}` : rawValue;
+    return;
+  }
+
+  const sport = findSportInText(rawValue, sportOptions);
+
+  if (sport) {
+    player.sport ||= sport;
+  }
+
+  player.team ||= rawValue;
+
+  const cohortMatch =
+    rawValue.match(/camada\s*\d{4}/i) ??
+    rawValue.match(/\b(?:sub|u)\s*-?\s*\d{1,2}\b/i) ??
+    rawValue.match(/\bm\s*\d{1,2}\b/i);
+
+  if (cohortMatch) {
+    player.cohort ||= cohortMatch[0].replace(/\s+/g, ' ');
+  }
+}
+
 function rowToPlayerImportData(
   headers: string[],
   row: unknown[],
@@ -278,15 +420,36 @@ function rowToPlayerImportData(
     }
 
     hasMappedField = true;
-    applyFieldValue(player, field, rawValue);
+
+    if (field in player) {
+      applyFieldValue(player, field as keyof PlayerImportData, rawValue);
+      return;
+    }
+
+    applySpecialFieldValue(
+      player,
+      field as Exclude<ImportColumnField, keyof PlayerImportData>,
+      rawValue,
+      sportOptions,
+    );
   });
 
   if (!hasMappedField) {
     return null;
   }
 
+  const normalizedSport = normalizeSport(player.sport, sportOptions);
+
+  if (normalizedSport) {
+    player.sport = normalizedSport;
+  }
+
   if (!player.sport || !sportOptions.includes(player.sport)) {
     player.sport = defaultSport;
+  }
+
+  if (!player.team && player.cohort) {
+    player.team = `${player.sport} ${player.cohort}`.trim();
   }
 
   return player;
@@ -299,6 +462,7 @@ function isValidPlayerRow(player: PlayerImportData) {
 export function hasRequiredImportColumns(headers: string[]) {
   let hasLastName = false;
   let hasFirstName = false;
+  let hasFullName = false;
 
   headers.forEach((header) => {
     const field = headerFieldMap[normalizeHeader(header)];
@@ -310,9 +474,13 @@ export function hasRequiredImportColumns(headers: string[]) {
     if (field === 'firstName') {
       hasFirstName = true;
     }
+
+    if (field === 'fullNameLastFirst' || field === 'fullNameFirstLast') {
+      hasFullName = true;
+    }
   });
 
-  return hasLastName && hasFirstName;
+  return (hasLastName && hasFirstName) || hasFullName;
 }
 
 export function downloadPlayerImportTemplate() {
@@ -322,6 +490,8 @@ export function downloadPlayerImportTemplate() {
     'Benicio',
     '60910046',
     'Rugby',
+    'Rugby',
+    'Rugby M8',
     'Rugby M8',
     'Camada 2018',
     'Presente',
@@ -372,116 +542,55 @@ export async function parseSpreadsheetFile(
 ): Promise<SpreadsheetImportResult> {
   const buffer = await file.arrayBuffer();
   const workbook = readWorkbookFromFile(buffer, file.name);
-  const sheetName = workbook.SheetNames[0];
-
-  if (!sheetName) {
+  if (workbook.SheetNames.length === 0) {
     return { players: [], skipped: 0, missingRequiredColumns: false };
   }
 
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
-    header: 1,
-    defval: '',
-    raw: false,
-  });
-
-  if (rows.length < 2) {
-    return { players: [], skipped: 0, missingRequiredColumns: false };
-  }
-
-  const headerRowIndex = findHeaderRowIndex(rows);
-
-  if (headerRowIndex < 0) {
-    return { players: [], skipped: 0, missingRequiredColumns: true };
-  }
-
-  const headers = (rows[headerRowIndex] ?? []).map((cell) => cellToString(cell));
   const players: PlayerImportData[] = [];
   let skipped = 0;
+  let validSheetCount = 0;
 
-  rows.slice(headerRowIndex + 1).forEach((row) => {
-    if (!Array.isArray(row) || row.every((cell) => !cellToString(cell))) {
+  workbook.SheetNames.forEach((sheetName) => {
+    const worksheet = workbook.Sheets[sheetName];
+
+    if (!worksheet) {
       return;
     }
 
-    const player = rowToPlayerImportData(headers, row, defaultSport, sportOptions);
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+      header: 1,
+      defval: '',
+      raw: false,
+    });
 
-    if (!player || !isValidPlayerRow(player)) {
-      skipped += 1;
+    if (rows.length < 2) {
       return;
     }
 
-    players.push(player);
-  });
+    const headerRowIndex = findHeaderRowIndex(rows);
 
-  return { players, skipped, missingRequiredColumns: false };
-}
-
-function extractLabeledValue(text: string, labels: string[]) {
-  for (const label of labels) {
-    const pattern = new RegExp(`${label}\\s*[:\\-]?\\s*([^\\n\\r,;]{2,80})`, 'iu');
-    const match = text.match(pattern);
-
-    if (match?.[1]) {
-      return match[1].trim();
+    if (headerRowIndex < 0) {
+      return;
     }
-  }
 
-  return '';
-}
+    validSheetCount += 1;
+    const headers = (rows[headerRowIndex] ?? []).map((cell) => cellToString(cell));
 
-export function extractPlayerFromOcrText(text: string, defaultSport: string): PlayerImportData {
-  const player = emptyPlayerImportData();
-  const compactText = text.replace(/\s+/g, ' ').trim();
-
-  player.lastName = extractLabeledValue(compactText, ['apellido', 'apellidos']).toUpperCase();
-  player.firstName = extractLabeledValue(compactText, ['nombre', 'nombres']).toUpperCase();
-  player.dni =
-    extractLabeledValue(compactText, ['dni', 'documento']) ||
-    (compactText.match(/\b\d{1,2}[.\s]?\d{3}[.\s]?\d{3}\b/)?.[0] ?? '');
-  player.memberNumber = extractLabeledValue(compactText, ['nro socio', 'numero socio', 'socio']);
-  player.address = extractLabeledValue(compactText, ['domicilio', 'direccion']);
-  player.birthDate = extractLabeledValue(compactText, ['fecha nacimiento', 'fecha de nacimiento']);
-  player.age = extractLabeledValue(compactText, ['edad']);
-  player.playerPhone =
-    extractLabeledValue(compactText, ['celular jugador', 'telefono jugador', 'celular']) ||
-    (compactText.match(/(?:\+?54)?\s?(?:9\s?)?(?:11|[2368]\d)\s?\d{3,4}[-\s]?\d{4}/)?.[0] ?? '');
-  player.fatherPhone = extractLabeledValue(compactText, ['celular padre', 'telefono padre']);
-  player.motherPhone = extractLabeledValue(compactText, ['celular madre', 'telefono madre']);
-  player.email =
-    extractLabeledValue(compactText, ['email', 'mail']) ||
-    (compactText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? '');
-  player.healthInsurance = extractLabeledValue(compactText, ['obra social']);
-  player.healthInsuranceNumber = extractLabeledValue(compactText, [
-    'numero obra social',
-    'nro obra social',
-  ]);
-  player.paymentMethod = extractLabeledValue(compactText, ['forma de pago']);
-  player.membershipType = extractLabeledValue(compactText, ['tipo socio']);
-  player.team = extractLabeledValue(compactText, ['equipo']);
-  player.cohort = extractLabeledValue(compactText, ['camada']);
-  player.sport = extractLabeledValue(compactText, ['deporte']) || defaultSport;
-
-  return player;
-}
-
-export async function recognizePlayerFromImage(
-  file: File,
-  defaultSport: string,
-  onProgress?: (progress: number) => void,
-): Promise<PlayerImportData> {
-  const worker = await createWorker('spa', 1, {
-    logger: (message) => {
-      if (message.status === 'recognizing text' && typeof message.progress === 'number') {
-        onProgress?.(Math.round(message.progress * 100));
+    rows.slice(headerRowIndex + 1).forEach((row) => {
+      if (!Array.isArray(row) || row.every((cell) => !cellToString(cell))) {
+        return;
       }
-    },
+
+      const player = rowToPlayerImportData(headers, row, defaultSport, sportOptions);
+
+      if (!player || !isValidPlayerRow(player)) {
+        skipped += 1;
+        return;
+      }
+
+      players.push(player);
+    });
   });
 
-  try {
-    const { data } = await worker.recognize(file);
-
-    return extractPlayerFromOcrText(data.text, defaultSport);
-  } finally {
-    await worker.terminate();
-  }
+  return { players, skipped, missingRequiredColumns: validSheetCount === 0 };
 }

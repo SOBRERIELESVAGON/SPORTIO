@@ -79,12 +79,21 @@ button {
 
 .login-hero-tagline {
   max-width: 90%;
-  margin: 0 0 3cm;
+  margin: 0 0 18px;
   color: rgba(255, 255, 255, 0.92);
   font-size: 3.75rem;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.02em;
+}
+
+.login-hero-tagline-en {
+  max-width: 80%;
+  margin: 0 0 3cm;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .login-card {
@@ -176,6 +185,27 @@ button {
   backdrop-filter: blur(18px);
 }
 
+.order-ready-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: baseline;
+  width: fit-content;
+  margin: 18px auto 0;
+  padding: 10px 16px;
+  border: 1px solid rgba(15, 122, 63, 0.18);
+  border-radius: 999px;
+  color: #0f3d2b;
+  background: #dcfce7;
+  box-shadow: 0 14px 34px rgba(15, 122, 63, 0.12);
+}
+
+.order-ready-banner span {
+  color: #3d5b49;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .brand,
 .nav-links,
 .hero-actions,
@@ -225,6 +255,8 @@ button {
 }
 
 .language-selector,
+.organization-selector,
+.group-preference-selector,
 .sport-preference-selector {
   display: grid;
   gap: 2px;
@@ -235,6 +267,9 @@ button {
 }
 
 .language-selector select,
+.organization-selector select,
+.organization-create-form input,
+.group-preference-selector select,
 .sport-preference-selector select {
   min-height: 32px;
   border: 1px solid #dce8e1;
@@ -248,6 +283,34 @@ button {
   text-transform: none;
 }
 
+.organization-selector label {
+  display: grid;
+  gap: 2px;
+}
+
+.organization-create-toggle,
+.organization-create-form button {
+  border: 0;
+  padding: 0;
+  color: #0f7a3f;
+  background: transparent;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-align: left;
+  cursor: pointer;
+  text-transform: none;
+}
+
+.organization-create-form {
+  display: grid;
+  gap: 6px;
+}
+
+.organization-create-form input {
+  width: 100%;
+  padding: 0 10px;
+}
+
 .login-language-row {
   display: flex;
   gap: 12px;
@@ -256,11 +319,16 @@ button {
 }
 
 .login-language-row .language-selector,
+.login-language-row .organization-selector,
+.login-language-row .group-preference-selector,
 .login-language-row .sport-preference-selector {
   width: min(220px, 100%);
 }
 
 .login-language-row .language-selector select,
+.login-language-row .organization-selector select,
+.login-language-row .organization-create-form input,
+.login-language-row .group-preference-selector select,
 .login-language-row .sport-preference-selector select {
   min-height: 42px;
   border-radius: 14px;
@@ -512,6 +580,16 @@ button {
   color: #667b6f;
 }
 
+.athlete-list-empty {
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed #dce8e1;
+  border-radius: 20px;
+  color: #667b6f;
+  background: #fbfdfc;
+  font-weight: 800;
+}
+
 .status {
   flex: 0 0 auto;
   padding: 8px 10px;
@@ -632,6 +710,28 @@ button {
   font-weight: 800;
 }
 
+.ad-slot-contact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+.ad-whatsapp-link {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: #128c7e;
+  font-weight: 900;
+}
+
+.ad-whatsapp-link svg {
+  width: 16px;
+  height: 16px;
+  fill: #25d366;
+}
+
 .ad-slot-live {
   border-style: solid;
   border-color: #86efac;
@@ -689,6 +789,10 @@ button {
 }
 
 .data-entry-panel,
+.player-list-panel,
+.survey-panel,
+.communication-panel,
+.physical-test-panel,
 .report-panel,
 .ranking-panel,
 .operations-panel,
@@ -704,11 +808,199 @@ button {
   box-shadow: 0 22px 70px rgba(16, 32, 23, 0.1);
 }
 
+.player-list-table {
+  display: grid;
+  gap: 10px;
+  overflow-x: auto;
+}
+
+.player-list-header,
+.player-list-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.9fr 1fr 1fr auto;
+  gap: 16px;
+  align-items: center;
+  min-width: 820px;
+}
+
+.player-list-header {
+  padding: 0 16px;
+  color: #667b6f;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.player-list-row {
+  padding: 14px 16px;
+  border: 1px solid #edf2ef;
+  border-radius: 20px;
+  background: #fbfdfc;
+}
+
+.player-list-row strong {
+  color: #102017;
+}
+
+.player-list-row span:not(.status) {
+  color: #667b6f;
+  font-weight: 700;
+}
+
+.collaboration-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.collaboration-form,
+.collaboration-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #edf2ef;
+  border-radius: 22px;
+  background: #fbfdfc;
+}
+
+.collaboration-form label {
+  display: grid;
+  gap: 8px;
+  color: #486154;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.collaboration-form input,
+.collaboration-form select,
+.collaboration-form textarea {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #dce8e1;
+  border-radius: 16px;
+  padding: 12px 14px;
+  color: #102017;
+  background: #fff;
+  font: inherit;
+  outline: none;
+}
+
+.collaboration-form textarea {
+  resize: vertical;
+}
+
+.collaboration-list,
+.survey-options {
+  display: grid;
+  gap: 12px;
+}
+
+.collaboration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.collaboration-card h3 {
+  margin: 4px 0 8px;
+  color: #102017;
+  font-size: 1.2rem;
+}
+
+.collaboration-card p,
+.collaboration-card small {
+  margin: 0;
+  color: #667b6f;
+  line-height: 1.6;
+  font-weight: 700;
+}
+
+.survey-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  border: 1px solid #dce8e1;
+  border-radius: 16px;
+  padding: 10px 14px;
+  color: #102017;
+  background: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.survey-option strong {
+  color: #0f7a3f;
+  white-space: nowrap;
+}
+
+.physical-test-list {
+  display: grid;
+  gap: 12px;
+}
+
+.physical-test-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #edf2ef;
+  border-radius: 22px;
+  background: #fbfdfc;
+}
+
+.physical-test-card h3,
+.physical-test-card p {
+  margin: 0;
+}
+
+.physical-test-card h3 {
+  color: #102017;
+  font-size: 1.2rem;
+}
+
+.physical-test-card strong {
+  color: #0f7a3f;
+  font-size: 1.4rem;
+}
+
+.physical-test-card small,
+.physical-test-card p {
+  color: #667b6f;
+  line-height: 1.6;
+  font-weight: 700;
+}
+
+.physical-test-chart {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8f3ed;
+}
+
+.physical-test-chart span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b6f264, #16a34a);
+}
+
 .section-heading > p:not(.eyebrow) {
   max-width: 680px;
   margin: -8px 0 0;
   color: #667b6f;
   line-height: 1.7;
+}
+
+.section-title-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.section-title-link:hover {
+  color: #0f7a3f;
 }
 
 .section-heading.compact h3 {
@@ -1049,24 +1341,26 @@ button {
   font-weight: 800;
 }
 
-.import-photo-preview {
-  display: grid;
-  gap: 8px;
+.manual-entry-heading {
+  margin-top: 22px;
+  padding: 18px 20px;
+  border: 1px solid #edf2ef;
+  border-radius: 24px;
+  background: #fbfdfc;
+}
+
+.manual-entry-heading h3 {
+  margin: 6px 0 8px;
+  color: #102017;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+}
+
+.manual-entry-heading p:not(.eyebrow) {
+  max-width: 760px;
   margin: 0;
-}
-
-.import-photo-preview img {
-  width: 100%;
-  max-height: 220px;
-  object-fit: cover;
-  border-radius: 16px;
-  border: 1px solid #e3ece7;
-}
-
-.import-photo-preview figcaption {
   color: #667b6f;
-  font-size: 0.82rem;
-  font-weight: 800;
+  line-height: 1.6;
+  font-weight: 700;
 }
 
 .data-table {
@@ -1587,6 +1881,7 @@ button {
   .hero,
   .content-grid,
   .metrics-grid,
+  .collaboration-grid,
   .data-form,
   .data-form-expanded,
   .report-filters,
@@ -1642,26 +1937,37 @@ button {
   }
 
   .login-hero {
+    justify-content: flex-start;
+    gap: 28px;
     min-height: 520px;
   }
 
   .login-hero .brand.brand-login {
-    top: 30px;
+    position: relative;
+    top: auto;
     gap: 20px;
-    font-size: 2.6rem;
+    font-size: 2rem;
   }
 
   .login-hero .brand.brand-login .brand-mark {
-    width: 88px;
-    height: 88px;
-    border-radius: 28px;
-    font-size: 2.1rem;
+    width: 72px;
+    height: 72px;
+    border-radius: 24px;
+    font-size: 1.8rem;
   }
 
   .login-hero-tagline {
-    margin-bottom: 3cm;
-    font-size: 2.85rem;
-    line-height: 1.3;
+    max-width: 100%;
+    margin-top: auto;
+    margin-bottom: 16px;
+    font-size: 2.2rem;
+    line-height: 1.16;
+  }
+
+  .login-hero-tagline-en {
+    max-width: 100%;
+    margin-bottom: 2cm;
+    font-size: 1rem;
   }
 
   .topbar {
@@ -1701,6 +2007,10 @@ button {
   .panel,
   .metric-card,
   .data-entry-panel,
+  .player-list-panel,
+  .survey-panel,
+  .communication-panel,
+  .physical-test-panel,
   .report-panel,
   .ranking-panel,
   .operations-panel,
@@ -1720,17 +2030,22 @@ button {
   .athlete-row,
   .session-card,
   .data-table-header,
-  .data-table-row {
+  .data-table-row,
+  .player-list-header,
+  .player-list-row {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .data-table-header,
-  .data-table-row {
+  .data-table-row,
+  .player-list-header,
+  .player-list-row {
     display: flex;
   }
 
-  .data-table-header {
+  .data-table-header,
+  .player-list-header {
     display: none;
   }
 

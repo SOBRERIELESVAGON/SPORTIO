@@ -26,9 +26,14 @@ import {
 import {
   downloadPlayerImportTemplate,
   parseSpreadsheetFile,
-  recognizePlayerFromImage,
   type PlayerImportData,
 } from './playerImport';
+import {
+  DEFAULT_ORGANIZATION_ID,
+  assertSameOrganization,
+  filterByOrganizationId,
+  type OrganizationId,
+} from './tenantAccess';
 
 type AttendanceStatus = 'Presente' | 'Ausente';
 type AttendanceActivity = 'Entrenamiento' | 'Partido';
@@ -46,6 +51,7 @@ type ReportScope = 'General' | 'División' | 'Equipo' | 'Camada' | 'Individual';
 
 type Athlete = {
   id: number;
+  organizationId: OrganizationId;
   memberNumber: string;
   lastName: string;
   firstName: string;
@@ -89,7 +95,49 @@ type GoogleJwtPayload = {
 type AuthenticatedUser = {
   email: string;
   name: string;
+  organizationId: OrganizationId;
   picture?: string;
+};
+
+type SurveyOption = {
+  id: string;
+  label: string;
+  votes: number;
+};
+
+type Survey = {
+  id: number;
+  organizationId: OrganizationId;
+  question: string;
+  options: SurveyOption[];
+  createdBy: string;
+  createdAt: string;
+  reviewedBy: string[];
+};
+
+type Communication = {
+  id: number;
+  organizationId: OrganizationId;
+  audience: 'general' | 'individual';
+  athleteId?: number;
+  title: string;
+  message: string;
+  createdBy: string;
+  createdAt: string;
+  readBy: string[];
+};
+
+type PhysicalTestRecord = {
+  id: number;
+  organizationId: OrganizationId;
+  athleteId: number;
+  testType: string;
+  value: number;
+  unit: string;
+  testDate: string;
+  notes: string;
+  createdBy: string;
+  createdAt: string;
 };
 
 type AppProps = {
@@ -131,9 +179,17 @@ const sportOptions = [
 ];
 
 const ALL_SPORTS_VALUE = '__all_sports__';
+const ALL_GROUPS_VALUE = '__all_groups__';
 const rememberedRoleKey = 'sportia.rememberedRole';
 const rememberedPasswordKey = 'sportia.rememberedPassword';
 const preferredSportKey = 'sportia.preferredSport';
+const preferredGroupKey = 'sportia.preferredGroup';
+const organizationOptionsKey = 'sportia.organizations';
+const preferredOrganizationKey = 'sportia.preferredOrganization';
+const athleteListStorageKey = 'sportia.athletes';
+const surveysStorageKey = 'sportia.surveys';
+const communicationsStorageKey = 'sportia.communications';
+const physicalTestsStorageKey = 'sportia.physicalTests';
 const protectedRoles: ProtectedRole[] = ['Staff', 'Coordinación', 'Master'];
 const rolePasswords: Record<ProtectedRole, string> = {
   Staff: 'staff2026',
@@ -171,6 +227,80 @@ const adSlots: {
     size: '728 x 90',
   },
 ];
+const advertisingWhatsAppNumber = '5493875313231';
+const advertisingWhatsAppUrl = `https://wa.me/${advertisingWhatsAppNumber}`;
+
+type OrganizationOption = {
+  id: OrganizationId;
+  name: string;
+};
+
+const defaultOrganizationOptions: OrganizationOption[] = [
+  { id: DEFAULT_ORGANIZATION_ID, name: 'Sportia Demo Club' },
+];
+
+const defaultGroupOptionsBySport: Record<string, string[]> = {
+  Rugby: [
+    ...Array.from({ length: 14 }, (_, index) => {
+      const division = String(index + 6).padStart(2, '0');
+
+      return `Rugby M${division} 2026`;
+    }),
+    'Plantel Superior',
+    'Rugby Plantel Superior 2026',
+  ],
+  Fútbol: [
+    'Fútbol Sub 8',
+    'Fútbol Sub 10',
+    'Fútbol Sub 12',
+    'Fútbol Sub 14',
+    'Fútbol Sub 16',
+    'Fútbol Sub 18',
+    'Fútbol Primera',
+    'Plantel Superior',
+  ],
+  Básquet: [
+    'Básquet Mini',
+    'Básquet U13',
+    'Básquet U15',
+    'Básquet U17',
+    'Básquet U19',
+    'Básquet Primera',
+    'Plantel Superior',
+  ],
+  Vóley: [
+    'Vóley Sub 13',
+    'Vóley Sub 15',
+    'Vóley Sub 17',
+    'Vóley Sub 19',
+    'Vóley Primera',
+    'Plantel Superior',
+  ],
+  'Hockey sobre césped': [
+    'Hockey Sub 12',
+    'Hockey Sub 14',
+    'Hockey Sub 16',
+    'Hockey Sub 19',
+    'Hockey Primera',
+    'Plantel Superior',
+  ],
+  Handball: [
+    'Handball Mini',
+    'Handball Cadetes',
+    'Handball Juveniles',
+    'Handball Juniors',
+    'Handball Primera',
+    'Plantel Superior',
+  ],
+  Futsal: [
+    'Futsal Sub 13',
+    'Futsal Sub 15',
+    'Futsal Sub 17',
+    'Futsal Sub 20',
+    'Futsal Primera',
+    'Plantel Superior',
+  ],
+};
 
 const reportPeriods: ReportPeriod[] = [
   'Diario',
@@ -254,8 +384,35 @@ function getAthleteFullName(athlete: Athlete) {
   return `${athlete.lastName} ${athlete.firstName}`.trim();
 }
 
+function normalizeDuplicateKeyPart(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function getAthleteDuplicateKey(athlete: Pick<Athlete, 'dni' | 'lastName' | 'firstName' | 'sport'>) {
+  const normalizedDni = normalizeDuplicateKeyPart(athlete.dni);
+
+  if (normalizedDni) {
+    return `dni:${normalizedDni}`;
+  }
+
+  return [
+    'name',
+    normalizeDuplicateKeyPart(athlete.lastName),
+    normalizeDuplicateKeyPart(athlete.firstName),
+    normalizeDuplicateKeyPart(athlete.sport),
+  ].join(':');
+}
+
 function filterAthletesBySport(athletes: Athlete[], sport: string) {
   return sport === ALL_SPORTS_VALUE ? athletes : athletes.filter((athlete) => athlete.sport === sport);
+}
+
+function getCohortShortLabel(cohort: string) {
+  return cohort.replace(/^camada\s*/i, '').trim();
 }
 
 function getDivisionFromTeam(team: string) {
@@ -282,6 +439,60 @@ function getDivisionFromTeam(team: string) {
   }
 
   return trimmedTeam;
+}
+
+function getAthleteGroupCandidates(athlete: Pick<Athlete, 'team' | 'cohort'>) {
+  const candidates = new Set<string>();
+  const team = athlete.team.trim();
+  const cohort = athlete.cohort.trim();
+  const division = getDivisionFromTeam(team);
+
+  if (team) {
+    candidates.add(team);
+  }
+
+  if (cohort) {
+    candidates.add(cohort);
+  }
+
+  if (division) {
+    candidates.add(division);
+  }
+
+  if (team && cohort) {
+    const shortCohort = getCohortShortLabel(cohort);
+    const normalizedTeam = normalizeDuplicateKeyPart(team);
+    const normalizedCohort = normalizeDuplicateKeyPart(cohort);
+    const normalizedShortCohort = normalizeDuplicateKeyPart(shortCohort);
+
+    if (
+      (!normalizedCohort || !normalizedTeam.includes(normalizedCohort)) &&
+      (!normalizedShortCohort || !normalizedTeam.includes(normalizedShortCohort))
+    ) {
+      candidates.add(shortCohort ? `${team} ${shortCohort}` : `${team} ${cohort}`);
+    }
+  }
+
+  return Array.from(candidates);
+}
+
+function getGroupFilterOptions(athletes: Athlete[], sport: string) {
+  const defaultOptions = defaultGroupOptionsBySport[sport] ?? [];
+
+  return Array.from(
+    new Set([
+      ...defaultOptions,
+      ...athletes.flatMap((athlete) => getAthleteGroupCandidates(athlete)).filter(Boolean),
+    ]),
+  ).sort((left, right) => left.localeCompare(right, 'es'));
+}
+
+function filterAthletesByGroup(athletes: Athlete[], group: string) {
+  if (group === ALL_GROUPS_VALUE) {
+    return athletes;
+  }
+
+  return athletes.filter((athlete) => getAthleteGroupCandidates(athlete).includes(group));
 }
 
 function getReportGroupOptions(
@@ -377,9 +588,14 @@ function numberFromForm(value: string) {
   return Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
 }
 
-function athleteFromImportData(data: PlayerImportData, id: number): Athlete {
+function athleteFromImportData(
+  data: PlayerImportData,
+  id: number,
+  organizationId: OrganizationId,
+): Athlete {
   return {
     id,
+    organizationId,
     memberNumber: data.memberNumber.trim(),
     lastName: data.lastName.trim().toUpperCase(),
     firstName: data.firstName.trim().toUpperCase(),
@@ -413,41 +629,6 @@ function athleteFromImportData(data: PlayerImportData, id: number): Athlete {
   };
 }
 
-function importDataToFormState(data: PlayerImportData, preferredSport: string) {
-  return {
-    memberNumber: data.memberNumber,
-    lastName: data.lastName,
-    firstName: data.firstName,
-    dni: data.dni,
-    address: data.address,
-    birthDate: data.birthDate,
-    age: data.age,
-    playerPhone: data.playerPhone,
-    fatherPhone: data.fatherPhone,
-    motherPhone: data.motherPhone,
-    email: data.email,
-    healthInsurance: data.healthInsurance,
-    healthInsuranceNumber: data.healthInsuranceNumber,
-    paymentMethod: data.paymentMethod,
-    memberStatus: data.memberStatus,
-    membershipType: data.membershipType,
-    nextBillingDate: data.nextBillingDate,
-    sport: data.sport || preferredSport,
-    team: data.team,
-    cohort: data.cohort,
-    perfectAttendance30Days: data.perfectAttendance30Days,
-    trainingsAttended: String(data.trainingsAttended),
-    trainingsTotal: String(data.trainingsTotal),
-    matchesAttended: String(data.matchesAttended),
-    matchesTotal: String(data.matchesTotal),
-    toursAttended: String(data.toursAttended),
-    toursTotal: String(data.toursTotal),
-    stayedAsGuest: data.stayedAsGuest,
-    hostedGuest: data.hostedGuest,
-    status: data.status,
-  };
-}
-
 function readStoredValue(key: string) {
   try {
     return window.localStorage.getItem(key);
@@ -470,6 +651,41 @@ function removeStoredValue(key: string) {
   } catch {
     // Local storage can be unavailable in private browsing or restricted contexts.
   }
+}
+
+function readStoredOrganizations() {
+  const storedOrganizations = readStoredValue(organizationOptionsKey);
+
+  if (!storedOrganizations) {
+    return defaultOrganizationOptions;
+  }
+
+  try {
+    const parsedOrganizations = JSON.parse(storedOrganizations) as OrganizationOption[];
+    const validOrganizations = parsedOrganizations.filter(
+      (organization) => organization.id && organization.name.trim(),
+    );
+
+    return validOrganizations.length > 0 ? validOrganizations : defaultOrganizationOptions;
+  } catch {
+    return defaultOrganizationOptions;
+  }
+}
+
+function writeStoredOrganizations(organizations: OrganizationOption[]) {
+  writeStoredValue(organizationOptionsKey, JSON.stringify(organizations));
+}
+
+function createOrganizationId(name: string) {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return `club-${slug || 'institucion'}-${Date.now()}`;
 }
 
 function LanguageSelector({
@@ -498,6 +714,72 @@ function LanguageSelector({
   );
 }
 
+function OrganizationSelector({
+  organizations,
+  selectedOrganizationId,
+  onOrganizationChange,
+  onOrganizationCreate,
+}: {
+  organizations: OrganizationOption[];
+  selectedOrganizationId: OrganizationId;
+  onOrganizationChange: (organizationId: OrganizationId) => void;
+  onOrganizationCreate: (organizationName: string) => void;
+}) {
+  const [newOrganizationName, setNewOrganizationName] = useState('');
+  const [isCreatingOrganization, setIsCreatingOrganization] = useState(false);
+
+  const handleCreateOrganization = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedName = newOrganizationName.trim();
+
+    if (!trimmedName) {
+      return;
+    }
+
+    onOrganizationCreate(trimmedName);
+    setNewOrganizationName('');
+    setIsCreatingOrganization(false);
+  };
+
+  return (
+    <div className="organization-selector">
+      <label>
+        Club / Institución
+        <select
+          value={selectedOrganizationId}
+          onChange={(event) => onOrganizationChange(event.target.value)}
+        >
+          {organizations.map((organization) => (
+            <option value={organization.id} key={organization.id}>
+              {organization.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {isCreatingOrganization ? (
+        <form className="organization-create-form" onSubmit={handleCreateOrganization}>
+          <input
+            type="text"
+            value={newOrganizationName}
+            onChange={(event) => setNewOrganizationName(event.target.value)}
+            placeholder="Nombre del club o institución"
+            autoFocus
+          />
+          <button type="submit">Agregar</button>
+        </form>
+      ) : (
+        <button
+          className="organization-create-toggle"
+          type="button"
+          onClick={() => setIsCreatingOrganization(true)}
+        >
+          No está mi club / Cargar institución
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SportPreferenceSelector({
   selectedSport,
   onSportChange,
@@ -514,6 +796,30 @@ function SportPreferenceSelector({
         {sportOptions.map((sport) => (
           <option value={sport} key={sport}>
             {sport}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function GroupPreferenceSelector({
+  groupOptions,
+  selectedGroup,
+  onGroupChange,
+}: {
+  groupOptions: string[];
+  selectedGroup: string;
+  onGroupChange: (group: string) => void;
+}) {
+  return (
+    <label className="group-preference-selector">
+      Equipo / Camada / División
+      <select value={selectedGroup} onChange={(event) => onGroupChange(event.target.value)}>
+        <option value={ALL_GROUPS_VALUE}>Todos los grupos</option>
+        {groupOptions.map((group) => (
+          <option value={group} key={group}>
+            {group}
           </option>
         ))}
       </select>
@@ -557,7 +863,21 @@ function AdSlot({
           {showsPendingGoogle ? (
             <small>{t('ad.googlePending')}</small>
           ) : (
-            <small>{t('ad.administered', { size })}</small>
+            <small className="ad-slot-contact">
+              <span>{size}</span>
+              <a
+                className="ad-whatsapp-link"
+                href={advertisingWhatsAppUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Consultar publicidad por WhatsApp al +54 9 387 531 3231"
+              >
+                <svg aria-hidden="true" viewBox="0 0 32 32" focusable="false">
+                  <path d="M16 3.2A12.7 12.7 0 0 0 5.1 22.4L3.6 28.8l6.5-1.7A12.8 12.8 0 1 0 16 3.2Zm0 22.9a10.1 10.1 0 0 1-5.2-1.4l-.4-.3-3.8 1 1-3.7-.2-.4A10.1 10.1 0 1 1 16 26.1Zm5.6-7.6c-.3-.2-1.8-.9-2.1-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.6c.2-.2.2-.3.3-.5.1-.2.1-.4 0-.6 0-.2-.7-1.7-1-2.3-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.2-1.2 2.9 0 1.7 1.3 3.4 1.5 3.6.2.2 2.5 3.8 6 5.3.8.4 1.5.6 2 .7.8.3 1.6.2 2.2.1.7-.1 1.8-.8 2.1-1.5.3-.7.3-1.4.2-1.5-.1-.1-.3-.2-.6-.4Z" />
+                </svg>
+                Consultar +54 9 387 531 3231
+              </a>
+            </small>
           )}
         </>
       )}
@@ -565,173 +885,265 @@ function AdSlot({
   );
 }
 
-const initialAthletes: Athlete[] = [
-  {
-    id: 1,
-    memberNumber: '4613',
-    lastName: 'MENDIVIL',
-    firstName: 'BENICIO',
-    dni: '60.910.046',
-    address: 'Avenida Paraguay 526, Salta',
-    birthDate: '27/02/2018',
-    age: '8',
-    playerPhone: '3874098343',
-    fatherPhone: '3875001001',
-    motherPhone: '3875001002',
-    email: 'natalia.valdez1317@gmail.com',
-    healthInsurance: 'OSDE',
-    healthInsuranceNumber: '2-4613-08',
-    paymentMethod: 'Mercado Pago',
-    memberStatus: 'Activo',
-    membershipType: 'Menor familia',
-    nextBillingDate: '30/04/2026',
-    sport: 'Rugby',
-    team: 'Rugby M8',
-    cohort: 'Camada 2018',
-    perfectAttendance30Days: true,
-    trainingsAttended: 12,
-    trainingsTotal: 12,
-    matchesAttended: 4,
-    matchesTotal: 4,
-    toursAttended: 1,
-    toursTotal: 1,
-    stayedAsGuest: true,
-    hostedGuest: true,
-    status: 'Presente',
-  },
-  {
-    id: 2,
-    memberNumber: '4614',
-    lastName: 'MENDEZ',
-    firstName: 'LUCIA',
-    dni: '54.128.882',
-    address: 'Las Heras 120, Salta',
-    birthDate: '14/08/2011',
-    age: '14',
-    playerPhone: '3875551234',
-    fatherPhone: '3875551200',
-    motherPhone: '3875551201',
-    email: 'lucia.mendez@example.com',
-    healthInsurance: 'Swiss Medical',
-    healthInsuranceNumber: 'SM-54128882',
-    paymentMethod: 'Transferencia',
-    memberStatus: 'Activo',
-    membershipType: 'Jugador juvenil',
-    nextBillingDate: '30/04/2026',
-    sport: 'Fútbol',
-    team: 'Fútbol Sub 14',
-    cohort: 'Camada 2011',
-    perfectAttendance30Days: true,
-    trainingsAttended: 11,
-    trainingsTotal: 12,
-    matchesAttended: 3,
-    matchesTotal: 4,
-    toursAttended: 1,
-    toursTotal: 1,
-    stayedAsGuest: false,
-    hostedGuest: true,
-    status: 'Presente',
-  },
-  {
-    id: 3,
-    memberNumber: '4615',
-    lastName: 'ROJAS',
-    firstName: 'MATEO',
-    dni: '52.443.219',
-    address: 'Belgrano 880, Salta',
-    birthDate: '03/11/2010',
-    age: '15',
-    playerPhone: '3875556778',
-    fatherPhone: '3875556700',
-    motherPhone: '3875556701',
-    email: 'mateo.rojas@example.com',
-    healthInsurance: 'Galeno',
-    healthInsuranceNumber: 'GA-52443219',
-    paymentMethod: 'Efectivo',
-    memberStatus: 'Activo',
-    membershipType: 'Jugador juvenil',
-    nextBillingDate: '30/04/2026',
-    sport: 'Básquet',
-    team: 'Básquet Sub 15',
-    cohort: 'Camada 2010',
-    perfectAttendance30Days: false,
-    trainingsAttended: 9,
-    trainingsTotal: 12,
-    matchesAttended: 4,
-    matchesTotal: 5,
-    toursAttended: 1,
-    toursTotal: 1,
-    stayedAsGuest: true,
-    hostedGuest: false,
-    status: 'Presente',
-  },
-  {
-    id: 4,
-    memberNumber: '4616',
-    lastName: 'ARIAS',
-    firstName: 'SOFIA',
-    dni: '53.887.102',
-    address: 'San Martin 410, Salta',
-    birthDate: '22/05/2012',
-    age: '13',
-    playerPhone: '3875554321',
-    fatherPhone: '3875554300',
-    motherPhone: '3875554301',
-    email: 'sofia.arias@example.com',
-    healthInsurance: 'Medife',
-    healthInsuranceNumber: 'ME-53887102',
-    paymentMethod: 'Debito automatico',
-    memberStatus: 'Activo',
-    membershipType: 'Jugadora juvenil',
-    nextBillingDate: '30/04/2026',
-    sport: 'Vóley',
-    team: 'Vóley Sub 13',
-    cohort: 'Camada 2012',
-    perfectAttendance30Days: false,
-    trainingsAttended: 8,
-    trainingsTotal: 12,
-    matchesAttended: 2,
-    matchesTotal: 4,
-    toursAttended: 1,
-    toursTotal: 1,
-    stayedAsGuest: false,
-    hostedGuest: false,
-    status: 'Presente',
-  },
-  {
-    id: 5,
-    memberNumber: '4617',
-    lastName: 'FERRERO',
-    firstName: 'TOMAS',
-    dni: '55.102.441',
-    address: 'Mitre 220, Salta',
-    birthDate: '09/02/2009',
-    age: '17',
-    playerPhone: '3875559988',
-    fatherPhone: '3875559900',
-    motherPhone: '3875559901',
-    email: 'tomas.ferrero@example.com',
-    healthInsurance: 'OSDE',
-    healthInsuranceNumber: 'OS-55102441',
-    paymentMethod: 'Debito automatico',
-    memberStatus: 'Activo',
-    membershipType: 'Jugador juvenil',
-    nextBillingDate: '30/04/2026',
-    sport: 'Rugby',
-    team: 'Rugby M17',
-    cohort: 'Camada 2009',
-    perfectAttendance30Days: true,
-    trainingsAttended: 12,
-    trainingsTotal: 12,
-    matchesAttended: 5,
-    matchesTotal: 5,
-    toursAttended: 2,
-    toursTotal: 2,
-    stayedAsGuest: false,
-    hostedGuest: true,
-    status: 'Presente',
-  },
-];
+const initialAthletes: Athlete[] = [];
+
+function isAttendanceStatus(value: unknown): value is AttendanceStatus {
+  return value === 'Presente' || value === 'Ausente';
+}
+
+function isMemberStatus(value: unknown): value is Athlete['memberStatus'] {
+  return value === 'Activo' || value === 'Inactivo';
+}
+
+function normalizeStoredAthlete(value: unknown): Athlete | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const athlete = value as Partial<Athlete>;
+
+  if (
+    typeof athlete.id !== 'number' ||
+    typeof athlete.lastName !== 'string' ||
+    typeof athlete.firstName !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    id: athlete.id,
+    organizationId: athlete.organizationId ?? DEFAULT_ORGANIZATION_ID,
+    memberNumber: athlete.memberNumber ?? '',
+    lastName: athlete.lastName,
+    firstName: athlete.firstName,
+    dni: athlete.dni ?? '',
+    address: athlete.address ?? '',
+    birthDate: athlete.birthDate ?? '',
+    age: athlete.age ?? '',
+    playerPhone: athlete.playerPhone ?? '',
+    fatherPhone: athlete.fatherPhone ?? '',
+    motherPhone: athlete.motherPhone ?? '',
+    email: athlete.email ?? '',
+    healthInsurance: athlete.healthInsurance ?? '',
+    healthInsuranceNumber: athlete.healthInsuranceNumber ?? '',
+    paymentMethod: athlete.paymentMethod ?? '',
+    memberStatus: isMemberStatus(athlete.memberStatus) ? athlete.memberStatus : 'Activo',
+    membershipType: athlete.membershipType ?? '',
+    nextBillingDate: athlete.nextBillingDate ?? '',
+    sport: athlete.sport ?? sportOptions[0],
+    team: athlete.team ?? '',
+    cohort: athlete.cohort ?? '',
+    perfectAttendance30Days: Boolean(athlete.perfectAttendance30Days),
+    trainingsAttended: athlete.trainingsAttended ?? 0,
+    trainingsTotal: athlete.trainingsTotal ?? 0,
+    matchesAttended: athlete.matchesAttended ?? 0,
+    matchesTotal: athlete.matchesTotal ?? 0,
+    toursAttended: athlete.toursAttended ?? 0,
+    toursTotal: athlete.toursTotal ?? 0,
+    stayedAsGuest: Boolean(athlete.stayedAsGuest),
+    hostedGuest: Boolean(athlete.hostedGuest),
+    status: isAttendanceStatus(athlete.status) ? athlete.status : 'Presente',
+  };
+}
+
+function readStoredAthletes(): Athlete[] {
+  const storedAthletes = readStoredValue(athleteListStorageKey);
+
+  if (!storedAthletes) {
+    return initialAthletes;
+  }
+
+  try {
+    const parsedAthletes = JSON.parse(storedAthletes) as unknown[];
+
+    if (!Array.isArray(parsedAthletes)) {
+      return initialAthletes;
+    }
+
+    return parsedAthletes
+      .map((athlete) => normalizeStoredAthlete(athlete))
+      .filter((athlete): athlete is Athlete => athlete !== null);
+  } catch {
+    return initialAthletes;
+  }
+}
+
+function writeStoredAthletes(athletes: Athlete[]) {
+  writeStoredValue(athleteListStorageKey, JSON.stringify(athletes));
+}
+
+function normalizeStoredSurvey(value: unknown): Survey | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const survey = value as Partial<Survey>;
+
+  if (
+    typeof survey.id !== 'number' ||
+    typeof survey.question !== 'string' ||
+    !Array.isArray(survey.options)
+  ) {
+    return null;
+  }
+
+  return {
+    id: survey.id,
+    organizationId: survey.organizationId ?? DEFAULT_ORGANIZATION_ID,
+    question: survey.question,
+    options: survey.options
+      .filter((option): option is SurveyOption =>
+        Boolean(
+          option &&
+            typeof option === 'object' &&
+            typeof option.id === 'string' &&
+            typeof option.label === 'string',
+        ),
+      )
+      .map((option) => ({
+        id: option.id,
+        label: option.label,
+        votes: Number.isFinite(option.votes) ? option.votes : 0,
+      })),
+    createdBy: survey.createdBy ?? 'Sistema',
+    createdAt: survey.createdAt ?? new Date().toISOString(),
+    reviewedBy: Array.isArray(survey.reviewedBy)
+      ? survey.reviewedBy.filter((value): value is string => typeof value === 'string')
+      : [],
+  };
+}
+
+function normalizeStoredCommunication(value: unknown): Communication | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const communication = value as Partial<Communication>;
+
+  if (
+    typeof communication.id !== 'number' ||
+    typeof communication.title !== 'string' ||
+    typeof communication.message !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    id: communication.id,
+    organizationId: communication.organizationId ?? DEFAULT_ORGANIZATION_ID,
+    audience: communication.audience === 'individual' ? 'individual' : 'general',
+    athleteId: communication.athleteId,
+    title: communication.title,
+    message: communication.message,
+    createdBy: communication.createdBy ?? 'Sistema',
+    createdAt: communication.createdAt ?? new Date().toISOString(),
+    readBy: Array.isArray(communication.readBy)
+      ? communication.readBy.filter((value): value is string => typeof value === 'string')
+      : [],
+  };
+}
+
+function normalizeStoredPhysicalTest(value: unknown): PhysicalTestRecord | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as Partial<PhysicalTestRecord>;
+
+  if (
+    typeof record.id !== 'number' ||
+    typeof record.athleteId !== 'number' ||
+    typeof record.testType !== 'string' ||
+    typeof record.value !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    id: record.id,
+    organizationId: record.organizationId ?? DEFAULT_ORGANIZATION_ID,
+    athleteId: record.athleteId,
+    testType: record.testType,
+    value: record.value,
+    unit: record.unit ?? '',
+    testDate: record.testDate ?? new Date().toISOString().slice(0, 10),
+    notes: record.notes ?? '',
+    createdBy: record.createdBy ?? 'Sistema',
+    createdAt: record.createdAt ?? new Date().toISOString(),
+  };
+}
+
+function readStoredSurveys(): Survey[] {
+  const storedSurveys = readStoredValue(surveysStorageKey);
+
+  if (!storedSurveys) {
+    return [];
+  }
+
+  try {
+    const parsedSurveys = JSON.parse(storedSurveys) as unknown[];
+
+    return Array.isArray(parsedSurveys)
+      ? parsedSurveys
+          .map((survey) => normalizeStoredSurvey(survey))
+          .filter((survey): survey is Survey => survey !== null)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredSurveys(surveys: Survey[]) {
+  writeStoredValue(surveysStorageKey, JSON.stringify(surveys));
+}
+
+function readStoredCommunications(): Communication[] {
+  const storedCommunications = readStoredValue(communicationsStorageKey);
+
+  if (!storedCommunications) {
+    return [];
+  }
+
+  try {
+    const parsedCommunications = JSON.parse(storedCommunications) as unknown[];
+
+    return Array.isArray(parsedCommunications)
+      ? parsedCommunications
+          .map((communication) => normalizeStoredCommunication(communication))
+          .filter((communication): communication is Communication => communication !== null)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredCommunications(communications: Communication[]) {
+  writeStoredValue(communicationsStorageKey, JSON.stringify(communications));
+}
+
+function readStoredPhysicalTests(): PhysicalTestRecord[] {
+  const storedRecords = readStoredValue(physicalTestsStorageKey);
+
+  if (!storedRecords) {
+    return [];
+  }
+
+  try {
+    const parsedRecords = JSON.parse(storedRecords) as unknown[];
+
+    return Array.isArray(parsedRecords)
+      ? parsedRecords
+          .map((record) => normalizeStoredPhysicalTest(record))
+          .filter((record): record is PhysicalTestRecord => record !== null)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredPhysicalTests(records: PhysicalTestRecord[]) {
+  writeStoredValue(physicalTestsStorageKey, JSON.stringify(records));
+}
 
 function decodeGoogleCredential(credential: string): GoogleJwtPayload | null {
   const [, payload] = credential.split('.');
@@ -770,6 +1182,7 @@ function userFromGoogleCredential(response: CredentialResponse): AuthenticatedUs
   return {
     email: payload.email,
     name: payload.name ?? payload.given_name ?? payload.email,
+    organizationId: DEFAULT_ORGANIZATION_ID,
     picture: payload.picture,
   };
 }
@@ -782,8 +1195,15 @@ function LoginScreen({
   onStaffAccess,
   onGoogleError,
   onLanguageChange,
+  onOrganizationChange,
+  onOrganizationCreate,
+  onPreferredGroupChange,
   onPreferredSportChange,
+  groupOptions,
+  organizations,
+  preferredGroup,
   preferredSport,
+  selectedOrganizationId,
   selectedLanguage,
   t,
 }: {
@@ -794,8 +1214,15 @@ function LoginScreen({
   onStaffAccess: (role: ProtectedRole, password: string, rememberPassword: boolean) => void;
   onGoogleError: () => void;
   onLanguageChange: (language: LanguageCode) => void;
+  onOrganizationChange: (organizationId: OrganizationId) => void;
+  onOrganizationCreate: (organizationName: string) => void;
+  onPreferredGroupChange: (group: string) => void;
   onPreferredSportChange: (sport: string) => void;
+  groupOptions: string[];
+  organizations: OrganizationOption[];
+  preferredGroup: string;
   preferredSport: string;
+  selectedOrganizationId: OrganizationId;
   selectedLanguage: LanguageCode;
   t: Translator;
 }) {
@@ -839,6 +1266,9 @@ function LoginScreen({
           <span>{t('common.brandName')}</span>
         </a>
         <p className="login-hero-tagline">{t('login.heroTagline')}</p>
+        <p className="login-hero-tagline-en">
+          Free sports attendance tracking app available in multiple languages.
+        </p>
       </section>
 
       <section className="login-card" aria-labelledby="login-title">
@@ -848,10 +1278,21 @@ function LoginScreen({
             onLanguageChange={onLanguageChange}
             t={t}
           />
+          <OrganizationSelector
+            organizations={organizations}
+            selectedOrganizationId={selectedOrganizationId}
+            onOrganizationChange={onOrganizationChange}
+            onOrganizationCreate={onOrganizationCreate}
+          />
           <SportPreferenceSelector
             selectedSport={preferredSport}
             onSportChange={onPreferredSportChange}
             t={t}
+          />
+          <GroupPreferenceSelector
+            groupOptions={groupOptions}
+            selectedGroup={preferredGroup}
+            onGroupChange={onPreferredGroupChange}
           />
         </div>
 
@@ -974,6 +1415,18 @@ function LoginScreen({
 
 function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const [organizations, setOrganizations] = useState<OrganizationOption[]>(() =>
+    readStoredOrganizations(),
+  );
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<OrganizationId>(() => {
+    const storedOrganizationId = readStoredValue(preferredOrganizationKey);
+    const storedOrganizations = readStoredOrganizations();
+
+    return storedOrganizations.some((organization) => organization.id === storedOrganizationId)
+      ? (storedOrganizationId as OrganizationId)
+      : DEFAULT_ORGANIZATION_ID;
+  });
+  const currentOrganizationId = user?.organizationId ?? selectedOrganizationId;
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>(() => {
     const storedLanguage = readStoredValue(languageKey);
 
@@ -990,15 +1443,75 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     writeStoredValue(languageKey, language);
   };
 
+  const handleOrganizationChange = (organizationId: OrganizationId) => {
+    setSelectedOrganizationId(organizationId);
+    writeStoredValue(preferredOrganizationKey, organizationId);
+    setUser((currentUser) =>
+      currentUser ? { ...currentUser, organizationId } : currentUser,
+    );
+    setSelectedPlayerId(null);
+    setSelectedDeleteIds([]);
+    setAthleteUndoStack([]);
+    setPreferredGroup(ALL_GROUPS_VALUE);
+    writeStoredValue(preferredGroupKey, ALL_GROUPS_VALUE);
+  };
+
+  const handleOrganizationCreate = (organizationName: string) => {
+    const trimmedName = organizationName.trim();
+
+    if (!trimmedName) {
+      return;
+    }
+
+    const organization: OrganizationOption = {
+      id: createOrganizationId(trimmedName),
+      name: trimmedName,
+    };
+    const nextOrganizations = [...organizations, organization];
+
+    setOrganizations(nextOrganizations);
+    writeStoredOrganizations(nextOrganizations);
+    handleOrganizationChange(organization.id);
+  };
+
   const [preferredSport, setPreferredSport] = useState(() => {
     const storedSport = readStoredValue(preferredSportKey);
 
     return storedSport && sportOptions.includes(storedSport) ? storedSport : sportOptions[0];
   });
+  const [preferredGroup, setPreferredGroup] = useState(() => {
+    return readStoredValue(preferredGroupKey) ?? ALL_GROUPS_VALUE;
+  });
   const [userRole, setUserRole] = useState<UserRole>('Jugador');
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [athleteList, setAthleteList] = useState<Athlete[]>(initialAthletes);
+  const [athleteList, setAthleteList] = useState<Athlete[]>(() => readStoredAthletes());
+  const [hasLoadedSharedAthletes, setHasLoadedSharedAthletes] = useState(false);
+  const [surveys, setSurveys] = useState<Survey[]>(() => readStoredSurveys());
+  const [hasLoadedSharedSurveys, setHasLoadedSharedSurveys] = useState(false);
+  const [communications, setCommunications] = useState<Communication[]>(() =>
+    readStoredCommunications(),
+  );
+  const [hasLoadedSharedCommunications, setHasLoadedSharedCommunications] = useState(false);
+  const [physicalTests, setPhysicalTests] = useState<PhysicalTestRecord[]>(() =>
+    readStoredPhysicalTests(),
+  );
+  const [hasLoadedSharedPhysicalTests, setHasLoadedSharedPhysicalTests] = useState(false);
+  const [surveyQuestion, setSurveyQuestion] = useState('');
+  const [surveyOptionsText, setSurveyOptionsText] = useState('Sí\nNo');
+  const [communicationAudience, setCommunicationAudience] =
+    useState<Communication['audience']>('general');
+  const [communicationAthleteId, setCommunicationAthleteId] = useState('');
+  const [communicationTitle, setCommunicationTitle] = useState('');
+  const [communicationMessage, setCommunicationMessage] = useState('');
+  const [physicalTestAthleteId, setPhysicalTestAthleteId] = useState('');
+  const [physicalTestType, setPhysicalTestType] = useState('Velocidad 40m');
+  const [physicalTestValue, setPhysicalTestValue] = useState('');
+  const [physicalTestUnit, setPhysicalTestUnit] = useState('seg');
+  const [physicalTestDate, setPhysicalTestDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [physicalTestNotes, setPhysicalTestNotes] = useState('');
   const [newAthlete, setNewAthlete] = useState({
     memberNumber: '',
     lastName: '',
@@ -1033,12 +1546,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   });
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [importLoading, setImportLoading] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
   const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const spreadsheetInputRef = useRef<HTMLInputElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const playersTableRef = useRef<HTMLDivElement>(null);
   const [spreadsheetFileName, setSpreadsheetFileName] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>(
@@ -1052,20 +1561,251 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [reportSport, setReportSport] = useState(preferredSport);
   const [reportScope, setReportScope] = useState<ReportScope>('General');
   const [reportTarget, setReportTarget] = useState(() =>
-    getReportGroupOptions(athleteList, 'General', preferredSport, {
-      wholeInstitution: 'Toda la institución',
-      noAthletes: 'Sin deportistas cargados',
-    })[0],
+    getReportGroupOptions(
+      filterByOrganizationId(athleteList, currentOrganizationId),
+      'General',
+      preferredSport,
+      {
+        wholeInstitution: 'Toda la institución',
+        noAthletes: 'Sin deportistas cargados',
+      },
+    )[0],
   );
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    fetch('/api/athletes')
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((sharedAthletes: unknown) => {
+        if (ignoreResponse || !Array.isArray(sharedAthletes)) {
+          return;
+        }
+
+        const normalizedAthletes = sharedAthletes
+          .map((athlete) => normalizeStoredAthlete(athlete))
+          .filter((athlete): athlete is Athlete => athlete !== null);
+
+        setAthleteList(normalizedAthletes);
+      })
+      .catch(() => {
+        // Browser-local persistence remains available if the demo API is unavailable.
+      })
+      .finally(() => {
+        if (!ignoreResponse) {
+          setHasLoadedSharedAthletes(true);
+        }
+      });
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    writeStoredAthletes(athleteList);
+
+    if (!hasLoadedSharedAthletes) {
+      return;
+    }
+
+    fetch('/api/athletes', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(athleteList),
+    }).catch(() => {
+      // Keep the browser copy even if the shared demo API is temporarily unavailable.
+    });
+  }, [athleteList, hasLoadedSharedAthletes]);
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    fetch('/api/surveys')
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((sharedSurveys: unknown) => {
+        if (ignoreResponse || !Array.isArray(sharedSurveys)) {
+          return;
+        }
+
+        setSurveys(
+          sharedSurveys
+            .map((survey) => normalizeStoredSurvey(survey))
+            .filter((survey): survey is Survey => survey !== null),
+        );
+      })
+      .catch(() => {
+        // Browser-local persistence remains available if the demo API is unavailable.
+      })
+      .finally(() => {
+        if (!ignoreResponse) {
+          setHasLoadedSharedSurveys(true);
+        }
+      });
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    writeStoredSurveys(surveys);
+
+    if (!hasLoadedSharedSurveys) {
+      return;
+    }
+
+    fetch('/api/surveys', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(surveys),
+    }).catch(() => {
+      // Keep the browser copy even if the shared demo API is temporarily unavailable.
+    });
+  }, [surveys, hasLoadedSharedSurveys]);
+
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    fetch('/api/communications')
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((sharedCommunications: unknown) => {
+        if (ignoreResponse || !Array.isArray(sharedCommunications)) {
+          return;
+        }
+
+        setCommunications(
+          sharedCommunications
+            .map((communication) => normalizeStoredCommunication(communication))
+            .filter((communication): communication is Communication => communication !== null),
+        );
+      })
+      .catch(() => {
+        // Browser-local persistence remains available if the demo API is unavailable.
+      })
+      .finally(() => {
+        if (!ignoreResponse) {
+          setHasLoadedSharedCommunications(true);
+        }
+      });
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    writeStoredCommunications(communications);
+
+    if (!hasLoadedSharedCommunications) {
+      return;
+    }
+
+    fetch('/api/communications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(communications),
+    }).catch(() => {
+      // Keep the browser copy even if the shared demo API is temporarily unavailable.
+    });
+  }, [communications, hasLoadedSharedCommunications]);
+
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    fetch('/api/physical-tests')
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((sharedRecords: unknown) => {
+        if (ignoreResponse || !Array.isArray(sharedRecords)) {
+          return;
+        }
+
+        setPhysicalTests(
+          sharedRecords
+            .map((record) => normalizeStoredPhysicalTest(record))
+            .filter((record): record is PhysicalTestRecord => record !== null),
+        );
+      })
+      .catch(() => {
+        // Browser-local persistence remains available if the demo API is unavailable.
+      })
+      .finally(() => {
+        if (!ignoreResponse) {
+          setHasLoadedSharedPhysicalTests(true);
+        }
+      });
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    writeStoredPhysicalTests(physicalTests);
+
+    if (!hasLoadedSharedPhysicalTests) {
+      return;
+    }
+
+    fetch('/api/physical-tests', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(physicalTests),
+    }).catch(() => {
+      // Keep the browser copy even if the shared demo API is temporarily unavailable.
+    });
+  }, [physicalTests, hasLoadedSharedPhysicalTests]);
+  const tenantAthleteList = useMemo(
+    () => filterByOrganizationId(athleteList, currentOrganizationId),
+    [athleteList, currentOrganizationId],
+  );
+  const athletesForPreferredSport = useMemo(
+    () => filterAthletesBySport(tenantAthleteList, preferredSport),
+    [tenantAthleteList, preferredSport],
+  );
+  const groupFilterOptions = useMemo(
+    () => getGroupFilterOptions(athletesForPreferredSport, preferredSport),
+    [athletesForPreferredSport, preferredSport],
+  );
+  const normalizedPreferredGroup =
+    preferredGroup === ALL_GROUPS_VALUE || groupFilterOptions.includes(preferredGroup)
+      ? preferredGroup
+      : ALL_GROUPS_VALUE;
   const athletesForView = useMemo(
-    () => athleteList.filter((athlete) => athlete.sport === preferredSport),
-    [athleteList, preferredSport],
+    () => filterAthletesByGroup(athletesForPreferredSport, normalizedPreferredGroup),
+    [athletesForPreferredSport, normalizedPreferredGroup],
   );
   const presentCount = athletesForView.filter((athlete) => athlete.status === 'Presente').length;
+  const absentAthletesForQuickList = useMemo(
+    () => athletesForView.filter((athlete) => athlete.status === 'Ausente'),
+    [athletesForView],
+  );
   const isPrivilegedUser = userRole === 'Staff' || userRole === 'Coordinación' || userRole === 'Master';
-  const canImportPlayers = userRole === 'Staff' || userRole === 'Coordinación';
+  const canImportPlayers =
+    userRole === 'Staff' || userRole === 'Coordinación' || userRole === 'Master';
   const isMasterUser = userRole === 'Master';
-  const selectedPlayer = athleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
+  const surveysForOrganization = useMemo(
+    () => surveys.filter((survey) => survey.organizationId === currentOrganizationId),
+    [surveys, currentOrganizationId],
+  );
+  const communicationsForOrganization = useMemo(
+    () =>
+      communications.filter(
+        (communication) => communication.organizationId === currentOrganizationId,
+      ),
+    [communications, currentOrganizationId],
+  );
+  const physicalTestsForOrganization = useMemo(
+    () =>
+      physicalTests
+        .filter((record) => record.organizationId === currentOrganizationId)
+        .sort((left, right) => right.testDate.localeCompare(left.testDate)),
+    [physicalTests, currentOrganizationId],
+  );
+  const physicalTestChartMax = Math.max(
+    1,
+    ...physicalTestsForOrganization.map((record) => Math.abs(record.value)),
+  );
+  const selectedPlayer =
+    tenantAthleteList.find((athlete) => athlete.id === selectedPlayerId) ?? null;
   const attendancePercentage =
     athletesForView.length > 0
       ? Math.round((presentCount / athletesForView.length) * 100)
@@ -1078,8 +1818,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     [t],
   );
   const athletesForReportSport = useMemo(
-    () => filterAthletesBySport(athleteList, reportSport),
-    [athleteList, reportSport],
+    () => filterAthletesBySport(tenantAthleteList, reportSport),
+    [tenantAthleteList, reportSport],
   );
   const reportTargetOptions = useMemo(
     () => getReportGroupOptions(athletesForReportSport, reportScope, reportSport, reportLabels),
@@ -1111,8 +1851,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [rankingSport, setRankingSport] = useState(preferredSport);
   const [rankingScope, setRankingScope] = useState<(typeof rankingScopes)[number]>('Camada');
   const rankingCandidates = useMemo(
-    () => filterAthletesBySport(athleteList, rankingSport),
-    [athleteList, rankingSport],
+    () => filterAthletesByGroup(filterAthletesBySport(tenantAthleteList, rankingSport), normalizedPreferredGroup),
+    [tenantAthleteList, rankingSport, normalizedPreferredGroup],
   );
   const rankingGroupOptions = Array.from(
     new Set(
@@ -1209,6 +1949,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setUser({
       email: `${role.toLowerCase()}@sportia.app`,
       name: role,
+      organizationId: currentOrganizationId,
     });
     setUserRole(role);
     setSelectedPlayerId(null);
@@ -1218,11 +1959,13 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const handlePreferredSportChange = (sport: string) => {
     setPreferredSport(sport);
     writeStoredValue(preferredSportKey, sport);
+    setPreferredGroup(ALL_GROUPS_VALUE);
+    writeStoredValue(preferredGroupKey, ALL_GROUPS_VALUE);
     setReportSport(sport);
     setRankingSport(sport);
     setNewAthlete((currentAthlete) => ({ ...currentAthlete, sport }));
 
-    const athletesInSport = filterAthletesBySport(athleteList, sport);
+    const athletesInSport = filterAthletesBySport(tenantAthleteList, sport);
     const nextTargetOptions = getReportGroupOptions(
       athletesInSport,
       reportScope,
@@ -1233,8 +1976,15 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setReportTarget(nextTargetOptions[0]);
   };
 
+  const handlePreferredGroupChange = (group: string) => {
+    setPreferredGroup(group);
+    writeStoredValue(preferredGroupKey, group);
+    setSelectedPlayerId(null);
+    setSelectedDeleteIds([]);
+  };
+
   const handlePlayerAccess = (athleteId: number) => {
-    const athlete = athleteList.find((currentAthlete) => currentAthlete.id === athleteId);
+    const athlete = tenantAthleteList.find((currentAthlete) => currentAthlete.id === athleteId);
 
     if (!athlete) {
       setAuthError(t('auth.playerNotFound'));
@@ -1244,10 +1994,185 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setUser({
       email: athlete.email || `${athlete.memberNumber || athlete.id}@sportia.app`,
       name: getAthleteFullName(athlete),
+      organizationId: athlete.organizationId,
     });
     setUserRole('Jugador');
     setSelectedPlayerId(athlete.id);
     setAuthError(null);
+  };
+
+  const handleSurveySubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const question = surveyQuestion.trim();
+    const options = surveyOptionsText
+      .split(/\r?\n/)
+      .map((option) => option.trim())
+      .filter(Boolean);
+
+    if (!question || options.length < 2) {
+      return;
+    }
+
+    const survey: Survey = {
+      id: Date.now(),
+      organizationId: currentOrganizationId,
+      question,
+      options: options.map((option, index) => ({
+        id: `${Date.now()}-${index}`,
+        label: option,
+        votes: 0,
+      })),
+      createdBy: user?.name ?? translateRole(selectedLanguage, userRole),
+      createdAt: new Date().toISOString(),
+      reviewedBy: [],
+    };
+
+    setSurveys((currentSurveys) => [survey, ...currentSurveys]);
+    setSurveyQuestion('');
+    setSurveyOptionsText('Sí\nNo');
+  };
+
+  const voteSurveyOption = (surveyId: number, optionId: string) => {
+    setSurveys((currentSurveys) =>
+      currentSurveys.map((survey) =>
+        survey.id === surveyId && survey.organizationId === currentOrganizationId
+          ? {
+              ...survey,
+              options: survey.options.map((option) =>
+                option.id === optionId ? { ...option, votes: option.votes + 1 } : option,
+              ),
+            }
+          : survey,
+      ),
+    );
+  };
+
+  const markSurveyReviewed = (surveyId: number) => {
+    const reviewer = user?.name ?? translateRole(selectedLanguage, userRole);
+
+    setSurveys((currentSurveys) =>
+      currentSurveys.map((survey) =>
+        survey.id === surveyId &&
+        survey.organizationId === currentOrganizationId &&
+        !survey.reviewedBy.includes(reviewer)
+          ? { ...survey, reviewedBy: [...survey.reviewedBy, reviewer] }
+          : survey,
+      ),
+    );
+  };
+
+  const deleteSurvey = (surveyId: number) => {
+    setSurveys((currentSurveys) =>
+      currentSurveys.filter(
+        (survey) =>
+          survey.organizationId !== currentOrganizationId ||
+          survey.id !== surveyId ||
+          survey.reviewedBy.length === 0,
+      ),
+    );
+  };
+
+  const handleCommunicationSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const title = communicationTitle.trim();
+    const message = communicationMessage.trim();
+    const athleteId =
+      communicationAudience === 'individual' ? Number(communicationAthleteId) : undefined;
+
+    if (!title || !message || (communicationAudience === 'individual' && !athleteId)) {
+      return;
+    }
+
+    const communication: Communication = {
+      id: Date.now(),
+      organizationId: currentOrganizationId,
+      audience: communicationAudience,
+      athleteId,
+      title,
+      message,
+      createdBy: user?.name ?? translateRole(selectedLanguage, userRole),
+      createdAt: new Date().toISOString(),
+      readBy: [],
+    };
+
+    setCommunications((currentCommunications) => [communication, ...currentCommunications]);
+    setCommunicationAudience('general');
+    setCommunicationAthleteId('');
+    setCommunicationTitle('');
+    setCommunicationMessage('');
+  };
+
+  const getCommunicationAudienceLabel = (communication: Communication) => {
+    if (communication.audience === 'general') {
+      return 'General para todos';
+    }
+
+    const athlete = tenantAthleteList.find(
+      (currentAthlete) => currentAthlete.id === communication.athleteId,
+    );
+
+    return athlete ? `Individual: ${getAthleteFullName(athlete)}` : 'Individual';
+  };
+
+  const markCommunicationRead = (communicationId: number) => {
+    const reader = user?.name ?? translateRole(selectedLanguage, userRole);
+
+    setCommunications((currentCommunications) =>
+      currentCommunications.map((communication) =>
+        communication.id === communicationId &&
+        communication.organizationId === currentOrganizationId &&
+        !communication.readBy.includes(reader)
+          ? { ...communication, readBy: [...communication.readBy, reader] }
+          : communication,
+      ),
+    );
+  };
+
+  const deleteCommunication = (communicationId: number) => {
+    setCommunications((currentCommunications) =>
+      currentCommunications.filter(
+        (communication) =>
+          communication.organizationId !== currentOrganizationId ||
+          communication.id !== communicationId ||
+          communication.readBy.length === 0,
+      ),
+    );
+  };
+
+  const handlePhysicalTestSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const athleteId = Number(physicalTestAthleteId);
+    const value = Number(physicalTestValue.replace(',', '.'));
+
+    if (!athleteId || !physicalTestType.trim() || !Number.isFinite(value)) {
+      return;
+    }
+
+    const record: PhysicalTestRecord = {
+      id: Date.now(),
+      organizationId: currentOrganizationId,
+      athleteId,
+      testType: physicalTestType.trim(),
+      value,
+      unit: physicalTestUnit.trim(),
+      testDate: physicalTestDate,
+      notes: physicalTestNotes.trim(),
+      createdBy: user?.name ?? translateRole(selectedLanguage, userRole),
+      createdAt: new Date().toISOString(),
+    };
+
+    setPhysicalTests((currentRecords) => [record, ...currentRecords]);
+    setPhysicalTestValue('');
+    setPhysicalTestNotes('');
+  };
+
+  const getPhysicalTestAthleteName = (athleteId: number) => {
+    const athlete = tenantAthleteList.find((currentAthlete) => currentAthlete.id === athleteId);
+
+    return athlete ? getAthleteFullName(athlete) : 'Jugador no encontrado';
   };
 
   const handleAthleteSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -1265,6 +2190,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
 
     const athlete: Athlete = {
       id: Date.now(),
+      organizationId: currentOrganizationId,
       memberNumber: newAthlete.memberNumber.trim(),
       lastName: trimmedLastName.toUpperCase(),
       firstName: trimmedFirstName.toUpperCase(),
@@ -1296,6 +2222,17 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       hostedGuest: newAthlete.hostedGuest,
       status: newAthlete.status,
     };
+
+    const duplicateExists = tenantAthleteList.some(
+      (currentAthlete) => getAthleteDuplicateKey(currentAthlete) === getAthleteDuplicateKey(athlete),
+    );
+
+    if (duplicateExists) {
+      setSaveMessage(
+        `El jugador ${trimmedLastName.toUpperCase()} ${trimmedFirstName.toUpperCase()} ya existe. Se mantiene el registro anterior.`,
+      );
+      return;
+    }
 
     setAthleteList((currentAthletes) => [athlete, ...currentAthletes]);
     setNewAthlete({
@@ -1340,24 +2277,35 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
 
   const addImportedPlayers = (players: PlayerImportData[]) => {
     const baseId = Date.now();
+    let addedCount = 0;
+    let duplicateCount = 0;
 
-    setAthleteList((currentAthletes) => [
-      ...players.map((player, index) => athleteFromImportData(player, baseId + index)),
-      ...currentAthletes,
-    ]);
-  };
+    setAthleteList((currentAthletes) => {
+      const existingKeys = new Set(
+        currentAthletes
+          .filter((athlete) => athlete.organizationId === currentOrganizationId)
+          .map((athlete) => getAthleteDuplicateKey(athlete)),
+      );
+      const athletesToAdd: Athlete[] = [];
 
-  const clearPhotoSelection = () => {
-    if (photoPreviewUrl) {
-      URL.revokeObjectURL(photoPreviewUrl);
-    }
+      players.forEach((player, index) => {
+        const athlete = athleteFromImportData(player, baseId + index, currentOrganizationId);
+        const duplicateKey = getAthleteDuplicateKey(athlete);
 
-    setPhotoPreviewUrl(null);
-    setPhotoFile(null);
+        if (existingKeys.has(duplicateKey)) {
+          duplicateCount += 1;
+          return;
+        }
 
-    if (photoInputRef.current) {
-      photoInputRef.current.value = '';
-    }
+        existingKeys.add(duplicateKey);
+        athletesToAdd.push(athlete);
+        addedCount += 1;
+      });
+
+      return [...athletesToAdd, ...currentAthletes];
+    });
+
+    return { addedCount, duplicateCount };
   };
 
   const scrollToPlayersTable = () => {
@@ -1398,11 +2346,26 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         return;
       }
 
-      addImportedPlayers(players);
+      const { addedCount, duplicateCount } = addImportedPlayers(players);
+
+      if (addedCount === 0) {
+        const duplicateText =
+          duplicateCount > 0
+            ? ` ${duplicateCount} duplicado(s) no se importaron: se mantiene el registro anterior.`
+            : '';
+
+        setImportStatus('error');
+        setImportMessage(`No se importaron jugadores nuevos.${duplicateText}`);
+        setSaveMessage(`No se importaron jugadores nuevos.${duplicateText}`);
+        return;
+      }
 
       const successText =
-        t('import.success', { count: players.length, name: file.name }) +
-        (skipped > 0 ? t('import.skipped', { count: skipped }) : '');
+        t('import.success', { count: addedCount, name: file.name }) +
+        (skipped > 0 ? t('import.skipped', { count: skipped }) : '') +
+        (duplicateCount > 0
+          ? ` ${duplicateCount} duplicado(s) no se importaron: se mantiene el registro anterior.`
+          : '');
 
       setImportStatus('success');
       setImportMessage(successText);
@@ -1414,68 +2377,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     } finally {
       setImportLoading(false);
       event.target.value = '';
-    }
-  };
-
-  const handlePhotoSelect = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    if (photoPreviewUrl) {
-      URL.revokeObjectURL(photoPreviewUrl);
-    }
-
-    setPhotoFile(file);
-    setPhotoPreviewUrl(URL.createObjectURL(file));
-    setImportMessage(null);
-  };
-
-  const handlePhotoImport = async () => {
-    if (!photoFile) {
-      setImportMessage(t('import.selectPhoto'));
-      return;
-    }
-
-    setImportLoading(true);
-    setImportProgress(0);
-    setImportMessage(null);
-
-    try {
-      const extracted = await recognizePlayerFromImage(
-        photoFile,
-        preferredSport,
-        setImportProgress,
-      );
-
-      if (
-        !extracted.lastName.trim() ||
-        !extracted.firstName.trim() ||
-        !extracted.dni.trim()
-      ) {
-        setNewAthlete((current) => ({
-          ...current,
-          ...importDataToFormState(extracted, preferredSport),
-        }));
-        setImportMessage(t('import.partial'));
-        return;
-      }
-
-      addImportedPlayers([extracted]);
-      setImportMessage(
-        t('import.fromPhoto', {
-          name: `${extracted.lastName.toUpperCase()} ${extracted.firstName.toUpperCase()}`,
-        }),
-      );
-      clearPhotoSelection();
-      setSaveMessage(null);
-    } catch {
-      setImportMessage(t('import.photoError'));
-    } finally {
-      setImportLoading(false);
-      setImportProgress(0);
     }
   };
 
@@ -1562,7 +2463,9 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const updateAthlete = (athleteId: number, updates: Partial<Athlete>) => {
     setAthleteList((currentAthletes) =>
       currentAthletes.map((athlete) =>
-        athlete.id === athleteId ? { ...athlete, ...updates } : athlete,
+        athlete.id === athleteId && athlete.organizationId === currentOrganizationId
+          ? { ...athlete, ...updates, organizationId: currentOrganizationId }
+          : athlete,
       ),
     );
   };
@@ -1581,7 +2484,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       return;
     }
 
-    const removedAthletes = athleteList.filter((athlete) => uniqueIds.includes(athlete.id));
+    const removedAthletes = tenantAthleteList.filter((athlete) => uniqueIds.includes(athlete.id));
 
     if (removedAthletes.length === 0) {
       return;
@@ -1589,7 +2492,10 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
 
     setAthleteUndoStack((currentStack) => [...currentStack.slice(-19), removedAthletes]);
     setAthleteList((currentAthletes) =>
-      currentAthletes.filter((athlete) => !uniqueIds.includes(athlete.id)),
+      currentAthletes.filter(
+        (athlete) =>
+          athlete.organizationId !== currentOrganizationId || !uniqueIds.includes(athlete.id),
+      ),
     );
     setSelectedDeleteIds((currentIds) => currentIds.filter((id) => !uniqueIds.includes(id)));
 
@@ -1660,7 +2566,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     }
 
     const lastBatch = athleteUndoStack[athleteUndoStack.length - 1];
-    const existingIds = new Set(athleteList.map((athlete) => athlete.id));
+    const existingIds = new Set(tenantAthleteList.map((athlete) => athlete.id));
     const athletesToRestore = lastBatch.filter((athlete) => !existingIds.has(athlete.id));
 
     if (athletesToRestore.length > 0) {
@@ -1671,37 +2577,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     setSaveMessage(t('table.restoredCount', { count: athletesToRestore.length }));
   };
 
-  const markAllAttendancePresent = () => {
-    setAthleteList((currentAthletes) =>
-      currentAthletes.map((athlete) => {
-        if (athlete.sport !== preferredSport) {
-          return athlete;
-        }
-
-        if (attendanceActivity === 'Entrenamiento') {
-          const trainingsTotal = Math.max(athlete.trainingsTotal, 1);
-
-          return {
-            ...athlete,
-            status: 'Presente',
-            trainingsTotal,
-            trainingsAttended: trainingsTotal,
-          };
-        }
-
-        const matchesTotal = Math.max(athlete.matchesTotal, 1);
-
-        return {
-          ...athlete,
-          status: 'Presente',
-          matchesTotal,
-          matchesAttended: matchesTotal,
-        };
-      }),
-    );
-  };
-
   const updateActivityAttendance = (athlete: Athlete, status: AttendanceStatus) => {
+    assertSameOrganization(athlete, currentOrganizationId);
     const isPresent = status === 'Presente';
 
     if (attendanceActivity === 'Entrenamiento') {
@@ -1724,35 +2601,18 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     });
   };
 
-  const updateTourAttendance = (athlete: Athlete, isPresent: boolean) => {
+  const updateTourAttendance = (athlete: Athlete, travels: boolean) => {
+    assertSameOrganization(athlete, currentOrganizationId);
     const toursTotal = Math.max(athlete.toursTotal, 1);
 
     updateAthlete(athlete.id, {
       toursTotal,
-      toursAttended: isPresent ? toursTotal : 0,
+      toursAttended: travels ? toursTotal : 0,
     });
   };
 
-  const markAllToursPresent = () => {
-    setAthleteList((currentAthletes) =>
-      currentAthletes.map((athlete) => {
-        if (athlete.sport !== preferredSport) {
-          return athlete;
-        }
-
-        const toursTotal = Math.max(athlete.toursTotal, 1);
-
-        return {
-          ...athlete,
-          toursTotal,
-          toursAttended: toursTotal,
-        };
-      }),
-    );
-  };
-
   const handleReportScopeChange = (scope: ReportScope) => {
-    const athletesInSport = filterAthletesBySport(athleteList, reportSport);
+    const athletesInSport = filterAthletesBySport(tenantAthleteList, reportSport);
     const nextTargetOptions = getReportGroupOptions(
       athletesInSport,
       scope,
@@ -1765,7 +2625,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   };
 
   const handleReportSportChange = (sport: string) => {
-    const athletesInSport = filterAthletesBySport(athleteList, sport);
+    const athletesInSport = filterAthletesBySport(tenantAthleteList, sport);
     const nextTargetOptions = getReportGroupOptions(
       athletesInSport,
       reportScope,
@@ -1785,11 +2645,18 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         googleClientIdConfigured={googleClientIdConfigured}
         onGoogleError={() => setAuthError(t('auth.googleError'))}
         onLanguageChange={handleLanguageChange}
+        onOrganizationChange={handleOrganizationChange}
+        onOrganizationCreate={handleOrganizationCreate}
+        onPreferredGroupChange={handlePreferredGroupChange}
         t={t}
         onPreferredSportChange={handlePreferredSportChange}
+        groupOptions={groupFilterOptions}
         onPlayerAccess={handlePlayerAccess}
         onStaffAccess={handleStaffAccess}
+        organizations={organizations}
+        preferredGroup={normalizedPreferredGroup}
         preferredSport={preferredSport}
+        selectedOrganizationId={currentOrganizationId}
         selectedLanguage={selectedLanguage}
       />
     );
@@ -1805,11 +2672,14 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         <div className="nav-links">
           {isPrivilegedUser ? <a href="#control-asistencia">{t('nav.attendance')}</a> : null}
           {isPrivilegedUser ? <a href="#carga-datos">{t('nav.dataEntry')}</a> : null}
+          {isPrivilegedUser ? <a href="#listado-jugadores">Listado de jugadores</a> : null}
+          {isPrivilegedUser ? <a href="#encuestas">Encuestas</a> : null}
+          {isPrivilegedUser ? <a href="#comunicaciones">Comunicaciones</a> : null}
+          {isPrivilegedUser ? <a href="#tests-fisicos">Tests físicos</a> : null}
           {userRole === 'Jugador' ? <a href="#mi-ficha">{t('nav.myProfile')}</a> : null}
           <a href="#ranking">{t('nav.ranking')}</a>
           {isMasterUser ? <a href="#master-panel">{t('nav.master')}</a> : null}
           {isPrivilegedUser ? <a href="#reportes">{t('nav.reports')}</a> : null}
-          {isPrivilegedUser ? <a href="#equipos">{t('nav.teams')}</a> : null}
         </div>
         <div className="user-menu">
           <LanguageSelector
@@ -1817,10 +2687,21 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
             onLanguageChange={handleLanguageChange}
             t={t}
           />
+          <OrganizationSelector
+            organizations={organizations}
+            selectedOrganizationId={currentOrganizationId}
+            onOrganizationChange={handleOrganizationChange}
+            onOrganizationCreate={handleOrganizationCreate}
+          />
           <SportPreferenceSelector
             selectedSport={preferredSport}
             onSportChange={handlePreferredSportChange}
             t={t}
+          />
+          <GroupPreferenceSelector
+            groupOptions={groupFilterOptions}
+            selectedGroup={normalizedPreferredGroup}
+            onGroupChange={handlePreferredGroupChange}
           />
           {user.picture ? (
             <img className="user-avatar" src={user.picture} alt="" referrerPolicy="no-referrer" />
@@ -1844,6 +2725,11 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           </button>
         </div>
       </nav>
+
+      <section className="order-ready-banner" aria-live="polite">
+        <strong>Última orden lista</strong>
+        <span>Latest request ready</span>
+      </section>
 
       <section className="hero" id="inicio">
         <div className="hero-copy">
@@ -1877,17 +2763,23 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
             </div>
             <h2>{t('hero.quickList')}</h2>
             <div className="athlete-list">
-              {athletesForView.slice(0, 5).map((athlete) => (
-                <article className="athlete-row" key={athlete.id}>
-                  <div>
-                    <strong>{getAthleteFullName(athlete)}</strong>
-                    <span>{athlete.sport} · DNI {athlete.dni}</span>
-                  </div>
-                  <span className={`status status-${athlete.status.toLowerCase()}`}>
-                    {translateAttendanceStatus(selectedLanguage, athlete.status)}
-                  </span>
-                </article>
-              ))}
+              {absentAthletesForQuickList.length > 0 ? (
+                absentAthletesForQuickList.slice(0, 5).map((athlete) => (
+                  <article className="athlete-row" key={athlete.id}>
+                    <div>
+                      <strong>{getAthleteFullName(athlete)}</strong>
+                      <span>{athlete.sport} · DNI {athlete.dni}</span>
+                    </div>
+                    <span className={`status status-${athlete.status.toLowerCase()}`}>
+                      {translateAttendanceStatus(selectedLanguage, athlete.status)}
+                    </span>
+                  </article>
+                ))
+              ) : (
+                <p className="athlete-list-empty">
+                  {selectedLanguage === 'es' ? 'Sin ausentes.' : 'No absentees.'}
+                </p>
+              )}
             </div>
           </aside>
         ) : (
@@ -1913,7 +2805,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
           <h2>{t('banner.title')}</h2>
           <p>{t('banner.desc')}</p>
         </div>
-        <span>{t('banner.owner')}</span>
       </section>
 
       <AdSlot
@@ -1932,6 +2823,372 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
               <strong>{metric.value}</strong>
             </article>
           ))}
+        </section>
+      ) : null}
+
+      {isPrivilegedUser ? (
+        <section
+          className="player-list-panel"
+          id="listado-jugadores"
+          aria-labelledby="player-list-title"
+        >
+          <div className="section-heading">
+            <p className="eyebrow">Padrón por deporte</p>
+            <h2 id="player-list-title">Listado de jugadores</h2>
+            <p>
+              Mostrando {athletesForView.length} jugador(es) cargados para {preferredSport}.
+            </p>
+          </div>
+
+          <div className="player-list-table" aria-label="Listado de jugadores por deporte">
+            <div className="player-list-header">
+              <span>{t('table.player')}</span>
+              <span>{t('table.dni')}</span>
+              <span>{t('form.team')}</span>
+              <span>{t('form.cohort')}</span>
+              <span>{t('table.attendance')}</span>
+            </div>
+            {athletesForView.length > 0 ? (
+              athletesForView.map((athlete) => (
+                <article className="player-list-row" key={`player-list-${athlete.id}`}>
+                  <strong>{getAthleteFullName(athlete)}</strong>
+                  <span>{athlete.dni || '-'}</span>
+                  <span>{athlete.team || '-'}</span>
+                  <span>{athlete.cohort || '-'}</span>
+                  <span className={`status status-${athlete.status.toLowerCase()}`}>
+                    {translateAttendanceStatus(selectedLanguage, athlete.status)}
+                  </span>
+                </article>
+              ))
+            ) : (
+              <p className="athlete-list-empty">No hay jugadores cargados para {preferredSport}.</p>
+            )}
+          </div>
+        </section>
+      ) : null}
+
+      {isPrivilegedUser ? (
+        <section className="survey-panel" id="encuestas" aria-labelledby="survey-title">
+          <div className="section-heading">
+            <p className="eyebrow">Participación</p>
+            <h2 id="survey-title">Encuestas</h2>
+            <p>
+              Creá encuestas para el staff del club y visualizá los resultados en tiempo real.
+            </p>
+          </div>
+
+          <div className="collaboration-grid">
+            <form className="collaboration-form" onSubmit={handleSurveySubmit}>
+              <label>
+                Pregunta
+                <input
+                  type="text"
+                  value={surveyQuestion}
+                  onChange={(event) => setSurveyQuestion(event.target.value)}
+                  placeholder="Ej: ¿Confirmamos entrenamiento el sábado?"
+                />
+              </label>
+              <label>
+                Opciones (una por línea)
+                <textarea
+                  value={surveyOptionsText}
+                  onChange={(event) => setSurveyOptionsText(event.target.value)}
+                  rows={4}
+                />
+              </label>
+              <button className="primary-button form-button" type="submit">
+                Crear encuesta
+              </button>
+            </form>
+
+            <div className="collaboration-list" aria-label="Resultados de encuestas">
+              {surveysForOrganization.length > 0 ? (
+                surveysForOrganization.map((survey) => {
+                  const totalVotes = survey.options.reduce((total, option) => total + option.votes, 0);
+
+                  return (
+                    <article className="collaboration-card" key={survey.id}>
+                      <div>
+                        <span className="eyebrow">Encuesta</span>
+                        <h3>{survey.question}</h3>
+                        <small>
+                          Creada por {survey.createdBy} ·{' '}
+                          {new Date(survey.createdAt).toLocaleDateString('es-AR')}
+                        </small>
+                        <small>
+                          Reporte: {totalVotes} voto(s) · Revisada por{' '}
+                          {survey.reviewedBy.length > 0 ? survey.reviewedBy.join(', ') : 'nadie'}
+                        </small>
+                      </div>
+                      <div className="survey-options">
+                        {survey.options.map((option) => {
+                          const percentage =
+                            totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
+
+                          return (
+                            <button
+                              className="survey-option"
+                              type="button"
+                              key={option.id}
+                              onClick={() => voteSurveyOption(survey.id, option.id)}
+                            >
+                              <span>{option.label}</span>
+                              <strong>
+                                {option.votes} voto(s) · {percentage}%
+                              </strong>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="collaboration-actions">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => markSurveyReviewed(survey.id)}
+                        >
+                          Marcar revisada
+                        </button>
+                        <button
+                          className="delete-player-button"
+                          type="button"
+                          disabled={survey.reviewedBy.length === 0}
+                          onClick={() => deleteSurvey(survey.id)}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
+              ) : (
+                <p className="athlete-list-empty">Todavía no hay encuestas creadas.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {isPrivilegedUser ? (
+        <section
+          className="communication-panel"
+          id="comunicaciones"
+          aria-labelledby="communication-title"
+        >
+          <div className="section-heading">
+            <p className="eyebrow">Mensajes</p>
+            <h2 id="communication-title">Comunicaciones</h2>
+            <p>
+              Enviá comunicados generales para todos o mensajes individuales dirigidos a un jugador.
+            </p>
+          </div>
+
+          <div className="collaboration-grid">
+            <form className="collaboration-form" onSubmit={handleCommunicationSubmit}>
+              <label>
+                Destinatario
+                <select
+                  value={communicationAudience}
+                  onChange={(event) =>
+                    setCommunicationAudience(event.target.value as Communication['audience'])
+                  }
+                >
+                  <option value="general">General para todos</option>
+                  <option value="individual">Individual</option>
+                </select>
+              </label>
+              {communicationAudience === 'individual' ? (
+                <label>
+                  Jugador
+                  <select
+                    value={communicationAthleteId}
+                    onChange={(event) => setCommunicationAthleteId(event.target.value)}
+                  >
+                    <option value="">Seleccionar jugador</option>
+                    {tenantAthleteList.map((athlete) => (
+                      <option value={athlete.id} key={athlete.id}>
+                        {getAthleteFullName(athlete)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <label>
+                Título
+                <input
+                  type="text"
+                  value={communicationTitle}
+                  onChange={(event) => setCommunicationTitle(event.target.value)}
+                  placeholder="Ej: Cambio de horario"
+                />
+              </label>
+              <label>
+                Mensaje
+                <textarea
+                  value={communicationMessage}
+                  onChange={(event) => setCommunicationMessage(event.target.value)}
+                  rows={4}
+                  placeholder="Escribí el comunicado..."
+                />
+              </label>
+              <button className="primary-button form-button" type="submit">
+                Publicar comunicación
+              </button>
+            </form>
+
+            <div className="collaboration-list" aria-label="Comunicaciones publicadas">
+              {communicationsForOrganization.length > 0 ? (
+                communicationsForOrganization.map((communication) => (
+                  <article className="collaboration-card" key={communication.id}>
+                    <div>
+                      <span className="eyebrow">{getCommunicationAudienceLabel(communication)}</span>
+                      <h3>{communication.title}</h3>
+                      <small>
+                        Publicado por {communication.createdBy} ·{' '}
+                        {new Date(communication.createdAt).toLocaleDateString('es-AR')}
+                      </small>
+                      <small>
+                        Reporte: {communication.readBy.length > 0 ? 'Leída' : 'No leída'} ·{' '}
+                        {communication.readBy.length > 0
+                          ? `Leída por ${communication.readBy.join(', ')}`
+                          : 'Sin lecturas registradas'}
+                      </small>
+                    </div>
+                    <p>{communication.message}</p>
+                    <div className="collaboration-actions">
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => markCommunicationRead(communication.id)}
+                      >
+                        Marcar leída
+                      </button>
+                      <button
+                        className="delete-player-button"
+                        type="button"
+                        disabled={communication.readBy.length === 0}
+                        onClick={() => deleteCommunication(communication.id)}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p className="athlete-list-empty">Todavía no hay comunicaciones publicadas.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {isPrivilegedUser ? (
+        <section className="physical-test-panel" id="tests-fisicos" aria-labelledby="physical-test-title">
+          <div className="section-heading">
+            <p className="eyebrow">Rendimiento</p>
+            <h2 id="physical-test-title">Tests físicos periódicos</h2>
+            <p>
+              Registrá velocidad, resistencia, fuerza o flexibilidad y revisá la evolución temporal.
+            </p>
+          </div>
+
+          <div className="collaboration-grid">
+            <form className="collaboration-form" onSubmit={handlePhysicalTestSubmit}>
+              <label>
+                Jugador
+                <select
+                  value={physicalTestAthleteId}
+                  onChange={(event) => setPhysicalTestAthleteId(event.target.value)}
+                >
+                  <option value="">Seleccionar jugador</option>
+                  {tenantAthleteList.map((athlete) => (
+                    <option value={athlete.id} key={athlete.id}>
+                      {getAthleteFullName(athlete)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Test
+                <select
+                  value={physicalTestType}
+                  onChange={(event) => setPhysicalTestType(event.target.value)}
+                >
+                  <option value="Velocidad 40m">Velocidad 40m</option>
+                  <option value="Test de Cooper">Test de Cooper</option>
+                  <option value="Fuerza">Fuerza</option>
+                  <option value="Flexibilidad">Flexibilidad</option>
+                </select>
+              </label>
+              <label>
+                Marca
+                <input
+                  type="number"
+                  step="0.01"
+                  value={physicalTestValue}
+                  onChange={(event) => setPhysicalTestValue(event.target.value)}
+                  placeholder="Ej: 6.8"
+                />
+              </label>
+              <label>
+                Unidad
+                <input
+                  type="text"
+                  value={physicalTestUnit}
+                  onChange={(event) => setPhysicalTestUnit(event.target.value)}
+                  placeholder="seg, m, reps, cm"
+                />
+              </label>
+              <label>
+                Fecha
+                <input
+                  type="date"
+                  value={physicalTestDate}
+                  onChange={(event) => setPhysicalTestDate(event.target.value)}
+                />
+              </label>
+              <label>
+                Observaciones
+                <textarea
+                  value={physicalTestNotes}
+                  onChange={(event) => setPhysicalTestNotes(event.target.value)}
+                  rows={3}
+                  placeholder="Condiciones, lesión, clima, etc."
+                />
+              </label>
+              <button className="primary-button form-button" type="submit">
+                Guardar marca
+              </button>
+            </form>
+
+            <div className="physical-test-list" aria-label="Evolución temporal de tests físicos">
+              {physicalTestsForOrganization.length > 0 ? (
+                physicalTestsForOrganization.map((record) => {
+                  const barWidth = Math.max(8, Math.round((Math.abs(record.value) / physicalTestChartMax) * 100));
+
+                  return (
+                    <article className="physical-test-card" key={record.id}>
+                      <div>
+                        <span className="eyebrow">{record.testType}</span>
+                        <h3>{getPhysicalTestAthleteName(record.athleteId)}</h3>
+                        <small>
+                          {new Date(record.testDate).toLocaleDateString('es-AR')} · Cargado por {record.createdBy}
+                        </small>
+                      </div>
+                      <strong>
+                        {record.value} {record.unit}
+                      </strong>
+                      <div className="physical-test-chart" aria-hidden="true">
+                        <span style={{ width: `${barWidth}%` }} />
+                      </div>
+                      {record.notes ? <p>{record.notes}</p> : null}
+                    </article>
+                  );
+                })
+              ) : (
+                <p className="athlete-list-empty">Todavía no hay marcas físicas cargadas.</p>
+              )}
+            </div>
+          </div>
         </section>
       ) : null}
 
@@ -2186,7 +3443,11 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       <section className="operations-panel" id="control-asistencia" aria-labelledby="attendance-control-title">
         <div className="section-heading">
           <p className="eyebrow">{t('ops.attendance.eyebrow')}</p>
-          <h2 id="attendance-control-title">{t('ops.attendance.title')}</h2>
+          <h2 id="attendance-control-title">
+            <a className="section-title-link" href="#planilla-asistencia">
+              {t('ops.attendance.title')}
+            </a>
+          </h2>
           <p>
             {t('ops.attendance.desc')}
           </p>
@@ -2205,12 +3466,9 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
               <option value="Partido">{translateActivity(selectedLanguage, 'Partido')}</option>
             </select>
           </label>
-          <button className="export-button" type="button" onClick={markAllAttendancePresent}>
-            {t('ops.attendance.allPresent')}
-          </button>
         </div>
 
-        <div className="attendance-control-list">
+        <div className="attendance-control-list" id="planilla-asistencia">
           {athletesForView.map((athlete) => (
             <article className="attendance-control-row" key={`attendance-${athlete.id}`}>
               <div>
@@ -2243,21 +3501,19 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
       <section className="operations-panel" id="control-giras" aria-labelledby="tour-control-title">
         <div className="section-heading">
           <p className="eyebrow">{t('ops.tours.eyebrow')}</p>
-          <h2 id="tour-control-title">{t('ops.tours.title')}</h2>
+          <h2 id="tour-control-title">
+            <a className="section-title-link" href="#planilla-giras">
+              {t('ops.tours.title')}
+            </a>
+          </h2>
           <p>
             {t('ops.tours.desc')}
           </p>
         </div>
 
-        <div className="operation-toolbar">
-          <button className="export-button" type="button" onClick={markAllToursPresent}>
-            {t('ops.tours.allPresent')}
-          </button>
-        </div>
-
-        <div className="tour-control-list">
+        <div className="tour-control-list" id="planilla-giras">
           {athletesForView.map((athlete) => {
-            const isTourPresent = athlete.toursTotal === 0 || athlete.toursAttended >= athlete.toursTotal;
+            const travels = athlete.toursTotal === 0 || athlete.toursAttended >= athlete.toursTotal;
 
             return (
               <article className="tour-control-row" key={`tour-${athlete.id}`}>
@@ -2267,18 +3523,18 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                 </div>
                 <div className="segmented-control" aria-label={t('ranking.tourOf', { name: getAthleteFullName(athlete) })}>
                   <button
-                    className={isTourPresent ? 'active' : ''}
+                    className={travels ? 'active' : ''}
                     type="button"
                     onClick={() => updateTourAttendance(athlete, true)}
                   >
-                    Presente
+                    Viaja
                   </button>
                   <button
-                    className={!isTourPresent ? 'danger active' : 'danger'}
+                    className={!travels ? 'danger active' : 'danger'}
                     type="button"
                     onClick={() => updateTourAttendance(athlete, false)}
                   >
-                    Ausente
+                    No viaja
                   </button>
                 </div>
                 <label className="inline-checkbox">
@@ -2299,7 +3555,7 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                       updateAthlete(athlete.id, { hostedGuest: event.target.checked })
                     }
                   />
-                  {t('ops.hostsGuest')}
+                  Recibe
                 </label>
               </article>
             );
@@ -2362,46 +3618,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
                 ) : null}
               </article>
 
-              <article className="import-card">
-                <strong>{t('import.photoTitle')}</strong>
-                <p>
-                  {t('import.photoDesc')}
-                </p>
-                <div className="import-buttons">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={importLoading}
-                    onClick={() => photoInputRef.current?.click()}
-                  >
-                    {t('import.choosePhoto')}
-                  </button>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    disabled={importLoading || !photoFile}
-                    onClick={handlePhotoImport}
-                  >
-                    {importLoading && photoFile
-                      ? t('import.readingPhoto', { progress: importProgress })
-                      : t('import.extractPhoto')}
-                  </button>
-                </div>
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  hidden
-                  onChange={handlePhotoSelect}
-                />
-                {photoPreviewUrl ? (
-                  <figure className="import-photo-preview">
-                    <img src={photoPreviewUrl} alt={t('import.previewAlt')} />
-                    <figcaption>{t('import.previewCaption')}</figcaption>
-                  </figure>
-                ) : null}
-              </article>
             </div>
 
             {importMessage ? (
@@ -2421,6 +3637,12 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
             ) : null}
           </div>
         ) : null}
+
+        <div className="manual-entry-heading">
+          <p className="eyebrow">Carga manual</p>
+          <h3>Agregar jugador manualmente</h3>
+          <p>Usá este formulario cuando quieras cargar o corregir una ficha individual sin planilla.</p>
+        </div>
 
         <form className="data-form data-form-expanded" onSubmit={handleAthleteSubmit}>
           <label>
@@ -3024,18 +4246,6 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
         <p className="report-note">{t('report.note')}</p>
       </section>
 
-      <section className="content-grid single-panel-grid">
-        <div className="panel accent-panel" id="equipos">
-          <p className="eyebrow">{t('panel.eyebrow')}</p>
-          <h2>{t('panel.title')}</h2>
-          <p>
-            {t('panel.desc')}
-          </p>
-          <a className="secondary-button light" href="#carga-datos">
-            {t('panel.start')}
-          </a>
-        </div>
-      </section>
         </>
       ) : null}
       <AdSlot
