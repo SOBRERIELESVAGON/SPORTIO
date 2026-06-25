@@ -1783,8 +1783,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
   const [rankingSport, setRankingSport] = useState(preferredSport);
   const [rankingScope, setRankingScope] = useState<(typeof rankingScopes)[number]>('Camada');
   const rankingCandidates = useMemo(
-    () => filterAthletesBySport(tenantAthleteList, rankingSport),
-    [tenantAthleteList, rankingSport],
+    () => filterAthletesByGroup(filterAthletesBySport(tenantAthleteList, rankingSport), normalizedPreferredGroup),
+    [tenantAthleteList, rankingSport, normalizedPreferredGroup],
   );
   const rankingGroupOptions = Array.from(
     new Set(
