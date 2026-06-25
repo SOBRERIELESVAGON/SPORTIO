@@ -239,6 +239,20 @@ const defaultOrganizationOptions: OrganizationOption[] = [
   { id: DEFAULT_ORGANIZATION_ID, name: 'Sportia Demo Club' },
 ];
 
+const defaultGroupOptionsBySport: Record<string, string[]> = {
+  Rugby: Array.from({ length: 14 }, (_, index) => {
+    const division = String(index + 6).padStart(2, '0');
+
+    return `Rugby M${division} 2026`;
+  }),
+  Fútbol: ['Fútbol Sub 8', 'Fútbol Sub 10', 'Fútbol Sub 12', 'Fútbol Sub 14', 'Fútbol Sub 16', 'Fútbol Sub 18', 'Fútbol Primera'],
+  Básquet: ['Básquet Mini', 'Básquet U13', 'Básquet U15', 'Básquet U17', 'Básquet U19', 'Básquet Primera'],
+  Vóley: ['Vóley Sub 13', 'Vóley Sub 15', 'Vóley Sub 17', 'Vóley Sub 19', 'Vóley Primera'],
+  'Hockey sobre césped': ['Hockey Sub 12', 'Hockey Sub 14', 'Hockey Sub 16', 'Hockey Sub 19', 'Hockey Primera'],
+  Handball: ['Handball Mini', 'Handball Cadetes', 'Handball Juveniles', 'Handball Juniors', 'Handball Primera'],
+  Futsal: ['Futsal Sub 13', 'Futsal Sub 15', 'Futsal Sub 17', 'Futsal Sub 20', 'Futsal Primera'],
+};
+
 const reportPeriods: ReportPeriod[] = [
   'Diario',
   'Semanal',
@@ -413,9 +427,14 @@ function getAthleteGroupCandidates(athlete: Pick<Athlete, 'team' | 'cohort'>) {
   return Array.from(candidates);
 }
 
-function getGroupFilterOptions(athletes: Athlete[]) {
+function getGroupFilterOptions(athletes: Athlete[], sport: string) {
+  const defaultOptions = defaultGroupOptionsBySport[sport] ?? [];
+
   return Array.from(
-    new Set(athletes.flatMap((athlete) => getAthleteGroupCandidates(athlete)).filter(Boolean)),
+    new Set([
+      ...defaultOptions,
+      ...athletes.flatMap((athlete) => getAthleteGroupCandidates(athlete)).filter(Boolean),
+    ]),
   ).sort((left, right) => left.localeCompare(right, 'es'));
 }
 
@@ -1694,8 +1713,8 @@ function App({ googleClientIdConfigured, googleAdsConfigured }: AppProps) {
     [tenantAthleteList, preferredSport],
   );
   const groupFilterOptions = useMemo(
-    () => getGroupFilterOptions(athletesForPreferredSport),
-    [athletesForPreferredSport],
+    () => getGroupFilterOptions(athletesForPreferredSport, preferredSport),
+    [athletesForPreferredSport, preferredSport],
   );
   const normalizedPreferredGroup =
     preferredGroup === ALL_GROUPS_VALUE || groupFilterOptions.includes(preferredGroup)
